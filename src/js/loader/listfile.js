@@ -285,7 +285,8 @@ const getByIDOrUnknown = (id, ext = '') => {
 	* @returns {number|undefined} 
 	*/
 const getByFilename = (filename) => {
-	let lookup = nameLookup.get(filename.toLowerCase().replace(/\\/g, '/'));
+	filename = normalizeFilename(filename);
+	let lookup = nameLookup.get(filename);
 
 	// In the rare occasion we have a reference to an MDL/MDX file and it fails
 	// to resolve (as expected), attempt to resolve the M2 of the same name.
@@ -376,6 +377,8 @@ const setupFilterListfile = async () => {
 	core.view.$watch('config.listfileShowFileDataIDs', () => core.events.emit('listfile-needs-updating'), { immediate: true });
 }
 
+const normalizeFilename = (filename) => filename.toLowerCase().replace(/\\/g, '/');
+
 module.exports = {
 	setTables,
 	loadListFile,
@@ -392,5 +395,6 @@ module.exports = {
 	ingestIdentifiedFiles,
 	isLoaded,
 	updateListfileFilters,
-	setupFilterListfile
+	setupFilterListfile,
+	normalizeFilename
 };

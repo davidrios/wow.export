@@ -189,7 +189,8 @@ class CASC {
 			const creatureModelData = new WDCReader('DBFilesClient/CreatureModelData.db2');
 			await creatureModelData.parse();
 
-			await DBCreatures.initializeCreatureData(creatureDisplayInfo, creatureModelData);
+			const creatureGeosetMap = await DBCreatures.initializeCreatureGeosetData();
+			await DBCreatures.initializeCreatureData(creatureDisplayInfo, creatureModelData, creatureGeosetMap);
 		} else {
 			await this.progress.step();
 		}

@@ -19,6 +19,7 @@ const CompressionType = require('./CompressionType');
 const BufferWrapper = require('../buffer');
 
 const TABLE_FORMATS = {
+	0x43424457: { name: 'WDBC', wdcVersion: -1 },
 	0x32434457: { name: 'WDC2', wdcVersion: 2 },
 	0x434C5331: { name: 'CLS1', wdcVersion: 2 },
 	0x33434457: { name: 'WDC3', wdcVersion: 3 },
@@ -237,6 +238,9 @@ class WDCReader {
 
 		const wdcVersion = format.wdcVersion;
 		log.write('Processing DB file %s as %s', this.fileName, format.name);
+
+		if (wdcVersion < 1)
+			return await this.parseOldWdc(data, wdcVersion);
 
 		// Skip over WDC5 specific information for now
 		if (wdcVersion === 5) {
@@ -721,6 +725,100 @@ class WDCReader {
 
 				this.rows.set(recordID, out);
 			}
+		}
+
+		log.write('Parsed %s with %d rows', this.fileName, this.size);
+		this.isLoaded = true;
+	}
+
+	async parseOldWdc(data, wdcVersion) {
+		if (wdcVersion !== -1)
+			throw new Error(`Unsupported wdcVersion: ${wdcVersion}`);
+
+		const recordCount = data.readUInt32LE();
+		data.move(4); // fieldCount
+		const recordSize = data.readUInt32LE();
+		const stringTableSize = data.readUInt32LE();
+
+		// Load the DBD and parse a schema from it.
+		await this.loadSchema();
+
+		const HEADER_SIZE = 20;
+
+		const stringTable = this.stringTable;
+		const stringBlockOfs = HEADER_SIZE + (recordCount * recordSize);
+		data.seek(stringBlockOfs);
+		for (let i = 0; i < stringTableSize;) {
+			const oldPos = data.offset;
+			const stringResult = data.readString(data.indexOf(0x0) - data.offset, 'utf8');
+
+			if (stringResult !== "")
+				stringTable.set(i, stringResult);
+
+			if (data.offset == oldPos)
+				data.seek(oldPos + 1);
+
+			i += (data.offset - oldPos);
+		}
+
+		for (let i = 0, n = recordCount; i < n; i++) {
+			const recordOfs = HEADER_SIZE + (i * recordSize);
+
+			data.seek(recordOfs);
+
+			const out = {};
+			for (const [prop, type] of this.schema.entries()) {
+				if (type === FieldType.Relation) {
+					out[prop] = 0;
+					continue;
+				}
+
+				let count;
+				let fieldType = type;
+				if (Array.isArray(type))
+					[fieldType, count] = type;
+
+				switch (fieldType) {
+					case FieldType.String:
+						if (count > 0) {
+							out[prop] = new Array(count);
+							for (let stringArrayIndex = 0; stringArrayIndex < count; stringArrayIndex++) {
+								const stringTableIndex = data.readUInt32LE();
+								if (stringTableIndex == 0) {
+									out[prop][stringArrayIndex] = "";
+								} else {
+									if (stringTable.has(stringTableIndex))
+										out[prop][stringArrayIndex] = stringTable.get(stringTableIndex);
+									else
+										throw new Error('Missing stringtable entry');
+								}
+							}
+						} else {
+							const stringTableIndex = data.readUInt32LE();
+							if (stringTableIndex == 0) {
+								out[prop] = "";
+							} else {
+								if (stringTable.has(stringTableIndex))
+									out[prop] = stringTable.get(stringTableIndex);
+								else
+									throw new Error('Missing stringtable entry');
+							}
+						}
+						break;
+
+					case FieldType.Int8: out[prop] = data.readInt8(count); break;
+					case FieldType.UInt8: out[prop] = data.readUInt8(count); break;
+					case FieldType.Int16: out[prop] = data.readInt16LE(count); break;
+					case FieldType.UInt16: out[prop] = data.readUInt16LE(count); break;
+					case FieldType.Int32: out[prop] = data.readInt32LE(count); break;
+					case FieldType.UInt32: out[prop] = data.readUInt32LE(count); break;
+					case FieldType.Int64: out[prop] = data.readInt64LE(count); break;
+					case FieldType.UInt64: out[prop] = data.readUInt64LE(count); break;
+					case FieldType.Float: out[prop] = data.readFloatLE(count); break;
+				}
+			}
+
+			this.rows.set(out.ID, out);
 		}
 
 		log.write('Parsed %s with %d rows', this.fileName, this.size);

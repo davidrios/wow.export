@@ -9,13 +9,8 @@ const WDCReader = require('../WDCReader');
 const creatureDisplays = new Map();
 const displayIDToFileDataID = new Map();
 
-/**
- * Initialize creature data.
- * @param {WDCReader} creatureDisplayInfo 
- * @param {WDCReader} creatureModelData 
- */
-const initializeCreatureData = async (creatureDisplayInfo, creatureModelData) => {
-	log.write('Loading creature textures...');
+const initializeCreatureGeosetData = async () => {
+	log.write('Loading creature geosets...');
 
 	const creatureGeosetMap = new Map();
 
@@ -28,6 +23,17 @@ const initializeCreatureData = async (creatureDisplayInfo, creatureModelData) =>
 
 		creatureGeosetMap.get(geosetRow.CreatureDisplayInfoID).push((geosetRow.GeosetIndex + 1) * 100 + geosetRow.GeosetValue);
 	}
+
+	return creatureGeosetMap;
+}
+
+/**
+ * Initialize creature data.
+ * @param {WDCReader} creatureDisplayInfo 
+ * @param {WDCReader} creatureModelData 
+ */
+const initializeCreatureData = async (creatureDisplayInfo, creatureModelData, creatureGeosetMap) => {
+	log.write('Loading creature textures...');
 
 	const creatureDisplayInfoMap = new Map();
 	const modelIDToDisplayInfoMap = new Map();
@@ -88,6 +94,7 @@ const getFileDataIDByDisplayID = (displayID) => {
 }
 
 module.exports = {
+	initializeCreatureGeosetData,
 	initializeCreatureData,
 	getCreatureDisplaysByFileDataID,
 	getFileDataIDByDisplayID
