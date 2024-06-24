@@ -3,7 +3,7 @@
 	Authors: Kruithne <kruithne@gmail.com>
 	License: MIT
  */
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 const core = require('../core');
 
 class Texture {
@@ -11,10 +11,12 @@ class Texture {
 	 * Construct a new Texture instance.
 	 * @param {number} flags 
 	 * @param {number} fileDataID
+	 * @param {number} type
 	 */
-	constructor(flags, fileDataID) {
+	constructor(flags, fileDataID, type) {
 		this.flags = flags;
 		this.fileDataID = fileDataID || 0;
+		this.type = type;
 	}
 
 	/**

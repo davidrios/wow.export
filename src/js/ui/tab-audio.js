@@ -8,7 +8,7 @@ const log = require('../log');
 const path = require('path');
 const util = require('util');
 const generics = require('../generics');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 const ExportHelper = require('../casc/export-helper');
 const EncryptionError = require('../casc/blte-reader').EncryptionError;
 

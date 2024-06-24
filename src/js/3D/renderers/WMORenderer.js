@@ -11,7 +11,7 @@ const BLPFile = require('../../casc/blp');
 const Texture = require('../Texture');
 const WMOLoader = require('../loaders/WMOLoader');
 const M2Renderer = require('./M2Renderer');
-const listfile = require('../../casc/listfile');
+const listfile = require('../../loader/listfile');
 const textureRibbon = require('../../ui/texture-ribbon');
 
 const DEFAULT_MATERIAL = new THREE.MeshPhongMaterial({ color: 0x57afe2, side: THREE.DoubleSide });
@@ -236,7 +236,7 @@ class WMORenderer {
 					} else {
 						// New M2, load it from CASC and prepare for render.
 						const data = await casc.getFile(fileDataID);
-						const m2 = new M2Renderer(data, renderGroup, false, false);
+						const m2 = new M2Renderer(data, fileDataID, renderGroup, false, false);
 						
 						await m2.load();
 						await m2.loadSkin(0);

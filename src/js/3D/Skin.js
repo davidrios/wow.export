@@ -5,7 +5,7 @@
  */
 
 const util = require('util');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 const core = require('../core');
 
 const MAGIC_SKIN = 0x4E494B53;

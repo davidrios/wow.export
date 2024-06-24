@@ -14,7 +14,7 @@ const CDNConfig = require('./cdn-config');
 const BufferWrapper = require('../buffer');
 const BuildCache = require('./build-cache');
 const BLTEReader = require('./blte-reader').BLTEReader;
-const listfile = require('./listfile');
+const listfile = require('../loader/listfile');
 const core = require('../core');
 const generics = require('../generics');
 const CASCRemote = require('./casc-source-remote');
@@ -99,10 +99,11 @@ class CASCLocal extends CASC {
 		await this.loadRoot();
 
 		core.view.casc = this;
+		core.view.dataType = 'casc';
 
 		await this.loadListfile(this.build.BuildKey);
 		await this.loadTables();
-		await this.filterListfile();
+		await listfile.setupFilterListfile();
 		await this.initializeComponents();
 	}
 

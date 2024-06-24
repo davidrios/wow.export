@@ -12,7 +12,7 @@ const CASC = require('./casc-source');
 const VersionConfig = require('./version-config');
 const CDNConfig = require('./cdn-config');
 const BuildCache = require('./build-cache');
-const listfile = require('./listfile');
+const listfile = require('../loader/listfile');
 const BLTEReader = require('./blte-reader').BLTEReader;
 
 const EMPTY_HASH = '00000000000000000000000000000000';
@@ -181,10 +181,11 @@ class CASCRemote extends CASC {
 		await this.loadRoot();
 
 		core.view.casc = this;
+		core.view.dataType = 'casc';
 
 		await this.loadListfile(this.build.BuildConfig);
 		await this.loadTables();
-		await this.filterListfile();
+		await listfile.setupFilterListfile();
 		await this.initializeComponents();
 	}
 

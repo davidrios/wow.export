@@ -9,7 +9,7 @@ const ExportHelper = require('../casc/export-helper');
 const EncryptionError = require('../casc/blte-reader').EncryptionError;
 const generics = require('../generics');
 const util = require('util');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 
 let selectedFile = null;
 

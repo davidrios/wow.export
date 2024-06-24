@@ -6,7 +6,7 @@
 const core = require('../core');
 // const log = require('../log');
 // const generics = require('../generics');
-// const listfile = require('../casc/listfile');
+// const listfile = require('../loader/listfile');
 // const WDCReader = require('../db/WDCReader');
 // const path = require('path');
 

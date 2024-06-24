@@ -7,7 +7,7 @@ const net = require('net');
 const core = require('../core');
 const log = require('../log');
 const constants = require('../constants');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 const RCPConnection = require('./rcp-connection');
 const config = require('../config');
 

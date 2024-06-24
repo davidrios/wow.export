@@ -13,6 +13,7 @@ const core = require('../../core');
 const BufferWrapper = require('../../buffer');
 const AnimMapper = require('../AnimMapper');
 const log = require('../../log');
+const listfile = require('../../loader/listfile');
 
 const CHUNK_SFID = 0x44494653;
 const CHUNK_TXID = 0x44495854;
@@ -25,8 +26,9 @@ class M2Loader {
 	 * Construct a new M2Loader instance.
 	 * @param {BufferWrapper} data 
 	 */
-	constructor(data) {
+	constructor(data, fileID) {
 		this.data = data;
+		this.fileID = fileID;
 		this.isLoaded = false;
 		this.animFiles = new Map();
 	}
@@ -39,22 +41,31 @@ class M2Loader {
 		if (this.isLoaded === true)
 			return;
 
-		while (this.data.remainingBytes > 0) {
-			const chunkID = this.data.readUInt32LE();
-			const chunkSize = this.data.readUInt32LE();
-			const nextChunkPos = this.data.offset + chunkSize;
-	
-			switch (chunkID) {
-				case constants.MAGIC.MD21: await this.parseChunk_MD21(); break;
-				case CHUNK_SFID: this.parseChunk_SFID(chunkSize); break;
-				case CHUNK_TXID: this.parseChunk_TXID(); break;
-				case CHUNK_SKID: this.parseChunk_SKID(); break;
-				case CHUNK_BFID: this.parseChunk_BFID(chunkSize); break;
-				case CHUNK_AFID: this.parseChunk_AFID(chunkSize); break;
+		const magic = this.data.readUInt32LE();
+		if (magic === constants.MAGIC.MD20) {
+			this.data.seek(0);
+			await this.parseChunk_MD21();
+			this.parseRestMD20();
+		} else {
+			this.data.seek(0);
+
+			while (this.data.remainingBytes > 0) {
+				const chunkID = this.data.readUInt32LE();
+				const chunkSize = this.data.readUInt32LE();
+				const nextChunkPos = this.data.offset + chunkSize;
+		
+				switch (chunkID) {
+					case constants.MAGIC.MD21: await this.parseChunk_MD21(); break;
+					case CHUNK_SFID: this.parseChunk_SFID(chunkSize); break;
+					case CHUNK_TXID: this.parseChunk_TXID(); break;
+					case CHUNK_SKID: this.parseChunk_SKID(); break;
+					case CHUNK_BFID: this.parseChunk_BFID(chunkSize); break;
+					case CHUNK_AFID: this.parseChunk_AFID(chunkSize); break;
+				}
+		
+				// Ensure that we start at the next chunk exactly.
+				this.data.seek(nextChunkPos);
 			}
-	
-			// Ensure that we start at the next chunk exactly.
-			this.data.seek(nextChunkPos);
 		}
 
 		this.isLoaded = true;
@@ -629,8 +640,8 @@ class M2Loader {
 				const pos = this.data.offset;
 
 				this.data.seek(nameOfs);
-				const fileName = this.data.readString(nameLength);
-				fileName.replace('\0', ''); // Remove NULL characters.
+				let fileName = this.data.readString(nameLength);
+				fileName = fileName.replace('\0', ''); // Remove NULL characters.
 
 				if (fileName.length > 0)
 					texture.setFileName(fileName);
@@ -724,6 +735,20 @@ class M2Loader {
 		this.globalLoops = this.data.readInt16LE(globalLoopCount);
 
 		this.data.seek(base);
+	}
+
+	parseRestMD20() {
+		let baseName = listfile.getByID(this.fileID);
+		baseName = baseName.substring(0, baseName.length - 3);
+
+		this.skins = new Array(this.viewCount);
+		for (let i = 0; i < this.viewCount; i++) 
+			this.skins[i] = new Skin(listfile.getByFilename(`${baseName}${i.toString().padStart(2, 0)}.skin`));
+
+		// for (let i = 0, n = this.textures.length; i < n; i++)
+		// 	this.textures[i].fileDataID = this.data.readUInt32LE();
+
+		this.skeletonFileID = listfile.getByFilename(`${baseName}.skel`);
 	}
 }
 

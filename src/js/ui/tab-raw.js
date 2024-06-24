@@ -9,7 +9,7 @@ const log = require('../log');
 const ExportHelper = require('../casc/export-helper');
 const generics = require('../generics');
 const constants = require('../constants');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 
 let isDirty = true;
 

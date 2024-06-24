@@ -5,7 +5,7 @@
  */
 const path = require('path');
 const core = require('../core');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 
 let _syncID = 0;
 

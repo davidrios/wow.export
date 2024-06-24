@@ -4,7 +4,7 @@
 	License: MIT
  */
 const core = require('../../core');
-const listfile = require('../../casc/listfile');
+const listfile = require('../../loader/listfile');
 
 const LoaderGenerics = require('./LoaderGenerics');
 

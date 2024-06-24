@@ -9,7 +9,7 @@ const path = require('path');
 const fsp = require('fs').promises;
 const constants = require('../../constants');
 const generics = require('../../generics');
-const listfile = require('../../casc/listfile');
+const listfile = require('../../loader/listfile');
 const log = require('../../log');
 
 const BufferWrapper = require('../../buffer');

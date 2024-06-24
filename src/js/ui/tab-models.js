@@ -9,7 +9,7 @@ const util = require('util');
 const path = require('path');
 const BufferWrapper = require('../buffer');
 const ExportHelper = require('../casc/export-helper');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 const constants = require('../constants');
 const EncryptionError = require('../casc/blte-reader').EncryptionError;
 const FileWriter = require('../file-writer');
@@ -144,7 +144,7 @@ const previewModel = async (fileName) => {
 		const fileNameLower = fileName.toLowerCase();
 		if (fileNameLower.endsWith('.m2')) {
 			core.view.modelViewerActiveType = 'm2';
-			activeRenderer = new M2Renderer(file, renderGroup, true, core.view.config.modelViewerShowTextures);
+			activeRenderer = new M2Renderer(file, fileDataID, renderGroup, true, core.view.config.modelViewerShowTextures);
 			isM2 = true;
 		} else if (fileNameLower.endsWith('.wmo')) {
 			core.view.modelViewerActiveType = 'wmo';

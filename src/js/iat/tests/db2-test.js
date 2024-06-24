@@ -10,7 +10,7 @@ const util = require('util');
 const IntegrationTest = require('../integration-test');
 const WDCReader = require('../../db/WDCReader');
 const FieldType = require('../../db/FieldType');
-const listfile = require('../../casc/listfile');
+const listfile = require('../../loader/listfile');
 const generics = require('../../generics');
 const log = require('../../log');
 

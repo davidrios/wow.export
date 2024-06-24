@@ -12,10 +12,40 @@ const ExternalLinks = require('../external-links');
 
 const CASCLocal = require('../casc/casc-source-local');
 const CASCRemote = require('../casc/casc-source-remote');
+const MPQ = require('../mpq/mpq-source');
 
 let cascSource = null;
 
-const loadInstall = (index) => {
+const removeBrokenInstall = (installPath, product) => {
+	// In the event the given installation directory is now invalid, remove all
+	// recent local entries using that directory. If product was provided, we can
+	// filter more specifically for that broken build.
+	const recentLocal = core.view.config.recentLocal;
+	for (let i = recentLocal.length - 1; i >= 0; i--) {
+		const entry = recentLocal[i];
+		if (entry.path === installPath && (!product || entry.product === product))
+			recentLocal.splice(i, 1);
+	}
+}
+
+const updateRecentLocalInstallList = (installPath, product) => {
+	const recentLocal = core.view.config.recentLocal;
+	const preIndex = recentLocal.findIndex(e => e.path === installPath && e.product === product);
+	if (preIndex > -1) {
+		// Already in the list, bring it to the top (if not already).
+		if (preIndex > 0)
+			recentLocal.unshift(recentLocal.splice(preIndex, 1)[0]);
+	} else {
+		// Not in the list, add it to the top.
+		recentLocal.unshift({ path: installPath, product });
+	}
+
+	// Limit amount of entries allowed in the recent list.
+	if (recentLocal.length > constants.MAX_RECENT_LOCAL)
+		recentLocal.splice(constants.MAX_RECENT_LOCAL, recentLocal.length - constants.MAX_RECENT_LOCAL);
+}
+
+const loadCASCInstall = (index) => {
 	core.block(async () => {
 		core.view.showLoadScreen();
 
@@ -23,25 +53,8 @@ const loadInstall = (index) => {
 		core.view.availableLocalBuilds = null;
 		core.view.availableRemoteBuilds = null;
 
-		if (cascSource instanceof CASCLocal) {
-			// Update the recent local installation list..
-			const recentLocal = core.view.config.recentLocal;
-			const installPath = cascSource.dir;
-			const build = cascSource.builds[index];
-			const preIndex = recentLocal.findIndex(e => e.path === installPath && e.product === build.Product);
-			if (preIndex > -1) {
-				// Already in the list, bring it to the top (if not already).
-				if (preIndex > 0)
-					recentLocal.unshift(recentLocal.splice(preIndex, 1)[0]);
-			} else {
-				// Not in the list, add it to the top.
-				recentLocal.unshift({ path: installPath, product: build.Product });
-			}
-
-			// Limit amount of entries allowed in the recent list.
-			if (recentLocal.length > constants.MAX_RECENT_LOCAL)
-				recentLocal.splice(constants.MAX_RECENT_LOCAL, recentLocal.length - constants.MAX_RECENT_LOCAL);
-		}
+		if (cascSource instanceof CASCLocal) 
+			updateRecentLocalInstallList(cascSource.dir, cascSource.builds[index].Product);
 
 		try {
 			await cascSource.load(index);
@@ -56,6 +69,30 @@ const loadInstall = (index) => {
 		}
 	});
 };
+
+const loadMPQInstall = (mpq) => {
+	core.block(async () => {
+		core.view.showLoadScreen();
+
+		// Wipe the available build lists.
+		core.view.availableLocalBuilds = null;
+		core.view.availableRemoteBuilds = null;
+
+		updateRecentLocalInstallList(mpq.dir);
+
+		try {
+			await mpq.load();
+			core.view.setScreen('tab-models');
+		} catch (e) {
+			log.write('Failed to load MPQ: %o', e);
+			core.setToast('error', 'Unable to initialize MPQ. Try repairing your game installation, or seek support.', {
+				'View Log': () => log.openRuntimeLog(),
+				'Visit Support Discord': () => ExternalLinks.open('::DISCORD')
+			}, -1);
+			core.view.setScreen('source-select');
+		}
+	});
+}
 
 core.events.once('screen-source-select', async () => {
 	const pings = [];
@@ -96,26 +133,30 @@ core.events.once('screen-source-select', async () => {
 
 	const openInstall = async (installPath, product) => {
 		core.hideToast();
-		
-		try {
-			cascSource = new CASCLocal(installPath);
-			await cascSource.init();
 
-			if (product)
-				loadInstall(cascSource.builds.findIndex(build => build.Product === product));
-			else
-				core.view.availableLocalBuilds = cascSource.getProductList();
-		} catch (e) {
-			core.setToast('error', util.format('It looks like %s is not a valid World of Warcraft installation.', selector.value), null, -1);
-			log.write('Failed to initialize local CASC source: %s', e.message);
+		const mpq = new MPQ(installPath);
+		if (await mpq.isValid()) {
+			try {
+				await mpq.init();
+				loadMPQInstall(mpq);
+			} catch (e) {
+				core.setToast('error', util.format('Failed to load World of Warcraft installation at %s.', selector.value), null, -1);
+				log.write('Failed to initialize MPQ source: %s', e.message);
+				removeBrokenInstall(installPath, product);
+			}
+		} else {
+			try {
+				cascSource = new CASCLocal(installPath);
+				await cascSource.init();
 
-			// In the event the given installation directory is now invalid, remove all
-			// recent local entries using that directory. If product was provided, we can
-			// filter more specifically for that broken build.
-			for (let i = recentLocal.length - 1; i >= 0; i--) {
-				const entry = recentLocal[i];
-				if (entry.path === installPath && (!product || entry.product === product))
-					recentLocal.splice(i, 1);
+				if (product)
+					loadCASCInstall(cascSource.builds.findIndex(build => build.Product === product));
+				else
+					core.view.availableLocalBuilds = cascSource.getProductList();
+			} catch (e) {
+				core.setToast('error', util.format('It looks like %s is not a valid World of Warcraft installation.', selector.value), null, -1);
+				log.write('Failed to initialize local CASC source: %s', e.message);
+				removeBrokenInstall(installPath, product);
 			}
 		}
 	};
@@ -156,7 +197,7 @@ core.events.once('screen-source-select', async () => {
 
 	// Register for 'click-source-build' events which are fired when the user selects
 	// a build either for remote or local installations.
-	core.events.on('click-source-build', loadInstall);
+	core.events.on('click-source-build', loadCASCInstall);
 
 	// Once all pings are resolved, pick the fastest.
 	Promise.all(pings).then(() => {

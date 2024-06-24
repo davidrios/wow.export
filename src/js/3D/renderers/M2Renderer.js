@@ -24,8 +24,9 @@ class M2Renderer {
 	 * @param {boolean} [reactive=false]
 	 * @param {boolean} [useRibbon=true]
 	 */
-	constructor(data, renderGroup, reactive = false, useRibbon = true) {
+	constructor(data, fileID, renderGroup, reactive = false, useRibbon = true) {
 		this.data = data;
+		this.fileID = fileID;
 		this.renderGroup = renderGroup;
 		this.reactive = reactive;
 		this.materials = [];
@@ -42,7 +43,7 @@ class M2Renderer {
 	 */
 	async load() {
 		// Parse the M2 data.
-		this.m2 = new M2Loader(this.data);
+		this.m2 = new M2Loader(this.data, this.fileID);
 		await this.m2.load();
 
 		this.loadTextures();

@@ -7,7 +7,7 @@ const core = require('../../core');
 const log = require('../../log');
 const path = require('path');
 const generics = require('../../generics');
-const listfile = require('../../casc/listfile');
+const listfile = require('../../loader/listfile');
 
 const BLPFile = require('../../casc/blp');
 const M2Loader= require('../loaders/M2Loader');
@@ -28,7 +28,7 @@ class M2Exporter {
 	 * @param {number} fileDataID
 	 */
 	constructor(data, variantTextures, fileDataID) {
-		this.m2 = new M2Loader(data);
+		this.m2 = new M2Loader(data, listfile.getByID(fileDataID));
 		this.fileDataID = fileDataID;
 		this.variantTextures = variantTextures;
 		this.dataTextures = new Map();

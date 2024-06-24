@@ -7,7 +7,7 @@ const core = require('../core');
 const log = require('../log');
 const ExportHelper = require('../casc/export-helper');
 const generics = require('../generics');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 
 let manifest = null;
 

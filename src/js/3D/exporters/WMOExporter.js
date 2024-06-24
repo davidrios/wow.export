@@ -5,7 +5,7 @@
  */
 const core = require('../../core');
 const log = require('../../log');
-const listfile = require('../../casc/listfile');
+const listfile = require('../../loader/listfile');
 const path = require('path');
 const generics = require('../../generics');
 

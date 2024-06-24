@@ -13,7 +13,7 @@ const M2Exporter = require('../3D/exporters/M2Exporter');
 const WDCReader = require('../db/WDCReader');
 const ExportHelper = require('../casc/export-helper');
 const FileWriter = require('../file-writer');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 const realmlist = require('../casc/realmlist');
 const DBCreatures = require('../db/caches/DBCreatures');
 
@@ -207,7 +207,7 @@ async function updateActiveCustomization() {
 		console.log('Loading skinned model ' + fileDataID);
 
 		// Load model
-		const skinnedModelRenderer = new M2Renderer(await core.view.casc.getFile(fileDataID), renderGroup, false);
+		const skinnedModelRenderer = new M2Renderer(await core.view.casc.getFile(fileDataID), fileDataID, renderGroup, false);
 		skinnedModelRenderer.geosetKey = 'chrCustGeosets';
 		await skinnedModelRenderer.load();
 
@@ -379,7 +379,7 @@ async function previewModel(fileDataID) {
 
 		const file = await core.view.casc.getFile(fileDataID);
 
-		activeRenderer = new M2Renderer(file, renderGroup, true);
+		activeRenderer = new M2Renderer(file, fileDataID, renderGroup, true);
 		activeRenderer.geosetKey = 'chrCustGeosets';
 
 		await activeRenderer.load();

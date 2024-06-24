@@ -39,7 +39,8 @@ const view = {
 	configEdit: {}, // Temporary configuration clone used during user configuration editing.
 	availableLocalBuilds: null, // Array containing local builds to display during source select.
 	availableRemoteBuilds: null, // Array containing remote builds to display during source select.
-	casc: null, // Active CASC instance.
+	casc: null, // Active CASC/MPQ instance.
+	dataType: null, // Type of game data to load, either 'casc' or 'mpq'
 	cacheSize: 0, // Active size of the user cache.
 	userInputTactKey: '', // Value of manual tact key field.
 	userInputTactKeyName: '', // Value of manual tact key name field.

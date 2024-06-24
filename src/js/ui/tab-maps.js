@@ -7,7 +7,7 @@ const util = require('util');
 const core = require('../core');
 const log = require('../log');
 const path = require('path');
-const listfile = require('../casc/listfile');
+const listfile = require('../loader/listfile');
 const constants = require('../constants');
 
 const WDCReader = require('../db/WDCReader');

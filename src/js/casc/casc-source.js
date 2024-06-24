@@ -4,10 +4,9 @@
 	License: MIT
  */
 const BLTEReader = require('./blte-reader').BLTEReader;
-const listfile = require('./listfile');
+const listfile = require('../loader/listfile');
 const log = require('../log');
 const core = require('../core');
-const constants = require('../constants');
 const LocaleFlag = require('./locale-flags').flags;
 const ContentFlag = require('./content-flags');
 const InstallManifest = require('./install-manifest');
@@ -155,47 +154,9 @@ class CASC {
 	 */
 	async loadListfile(buildKey) {
 		await this.progress.step('Loading listfile');
-		const entries = await listfile.loadListfile(buildKey, this.cache, this.rootEntries);
+		const entries = await listfile.loadListFile(buildKey, this.cache, this.rootEntries);
 		if (entries === 0)
 			throw new Error('No listfile entries found');
-	}
-
-	/**
-	 * Returns an array of model formats to display.
-	 * @returns {Array}
-	 */
-	getModelFormats() {
-		// Filters for the model viewer depending on user settings.
-		const modelExt = [];
-		if (core.view.config.modelsShowM2)
-			modelExt.push('.m2');
-		
-		if (core.view.config.modelsShowWMO)
-			modelExt.push(['.wmo', constants.LISTFILE_MODEL_FILTER]);
-
-		return modelExt;
-	}
-
-	updateListfileFilters() {
-		core.view.listfileTextures = listfile.getFilenamesByExtension('.blp');
-		core.view.listfileSounds = listfile.getFilenamesByExtension(['.ogg', '.mp3', '.unk_sound']);
-		core.view.listfileVideos = listfile.getFilenamesByExtension('.avi');
-		core.view.listfileText = listfile.getFilenamesByExtension(['.txt', '.lua', '.xml', '.sbt', '.wtf', '.htm', '.toc', '.xsd']);
-		core.view.listfileModels = listfile.getFilenamesByExtension(this.getModelFormats());
-		core.view.listfileDB2s = listfile.getFilenamesByExtension('.db2');
-	}
-
-	/**
-	 * Creates filtered versions of the master listfile.
-	 */
-	async filterListfile() {
-		// Pre-filter extensions for tabs.
-		await this.progress.step('Filtering listfiles');
-
-		core.events.on('listfile-needs-updating', () => this.updateListfileFilters());
-
-		core.view.$watch('config.listfileSortByID', () => core.events.emit('listfile-needs-updating'));
-		core.view.$watch('config.listfileShowFileDataIDs', () => core.events.emit('listfile-needs-updating'), { immediate: true });
 	}
 
 	/**

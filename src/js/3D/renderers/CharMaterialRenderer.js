@@ -8,7 +8,7 @@ const fsp = require('fs').promises;
 const BLPFile = require('../../casc/blp');
 const core = require('../../core');
 const log = require('../../log');
-const listfile = require('../../casc/listfile');
+const listfile = require('../../loader/listfile');
 const constants = require('../../constants');
 const overlay = require('../../ui/char-texture-overlay');
 
