@@ -142,11 +142,8 @@ const viewItemTextures = (item) => {
 	core.view.overrideTextureName = item.name;
 };
 
-core.events.once('screen-tab-items', async () => {
-	// Initialize a loading screen.
+const loadCASCItems = async () => {
 	const progress = core.createProgress(5);
-	core.view.setScreen('loading');
-	core.view.isBusy++;
 
 	await progress.step('Loading item data...');
 	const itemSparse = new WDCReader('DBFilesClient/ItemSparse.db2');
@@ -247,6 +244,18 @@ core.events.once('screen-tab-items', async () => {
 			items.push(Object.freeze(new Item(itemID, itemRow, null, null, null)));
 		}
 	}
+
+	return items;
+}
+
+core.events.once('screen-tab-items', async () => {
+	// Initialize a loading screen.
+	core.view.setScreen('loading');
+	core.view.isBusy++;
+
+	const items = core.view.dataType === 'mpq'
+		? (await core.view.casc.loadItems(ITEM_SLOTS_IGNORED)).map(item => Object.freeze(new Item(...item)))
+		: await loadCASCItems();
 
 	// Show the item viewer screen.
 	core.view.loadPct = -1;

@@ -7,6 +7,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const cp = require('child_process');
+const util = require('util');
 const listfile = require('../loader/listfile');
 const constants = require('../constants');
 const log = require('../log');
@@ -19,6 +20,7 @@ const DBModelFileData = require('../db/caches/DBModelFileData');
 const DBTextureFileData = require('../db/caches/DBTextureFileData');
 const DBCreatures = require('../db/caches/DBCreatures');
 const DBItemDisplays = require('../db/caches/DBItemDisplays');
+const CASCRemote = require('../casc/casc-source-remote');
 
 const compareMPQName = (...ab) => {
 	ab = ab.map(t => {
@@ -63,6 +65,7 @@ class MPQ {
 	constructor(dir) {
 		this.dir = dir;
 		this.dataDir = path.join(dir, constants.BUILD.DATA_DIR);
+		this.remoteCASC = null;
 	}
 
 	async isValid() {
@@ -110,7 +113,6 @@ class MPQ {
 				const name = dirent.name.toLowerCase();
 				if (!name.endsWith('.mpq')) 
 					continue;
-        
 
 				const toPush = name.startsWith('patch') ? patchFiles : mpqFiles;
 				toPush[dirName].push(path.join(dataDirName, dirent.name));
@@ -198,8 +200,8 @@ class MPQ {
 		textureFileData.getAllRows = textureFileData.entries;
 
 		let resourceID = 0;
-		const m2Map = {};
-		const blpMap = {};
+		const itemDisplayM2Map = {};
+		const itemDisplayBlpMap = {};
 
 		for (const filePath of this.fileListMap.keys()) {
 			const match = filePath.match(/([^/]+?)(\.mdx|\.m2|\.blp)$/i);
@@ -208,7 +210,7 @@ class MPQ {
 
 			let name = match[1];
 			const ext = match[2];
-			const map = ext === '.blp' ? blpMap : m2Map;
+			const map = ext === '.blp' ? itemDisplayBlpMap : itemDisplayM2Map;
 
 			if (ext === '.m2' && filePath.startsWith('item/'))
 				name = getDisplayItemBaseName(name);
@@ -234,23 +236,12 @@ class MPQ {
 		await DBModelFileData.initializeModelFileData(modelFileData);
 		await DBTextureFileData.initializeTextureFileData(textureFileData);
 
+		this.itemDisplayM2Map = itemDisplayM2Map;
+		this.itemDisplayBlpMap = itemDisplayBlpMap;
+
 		if (core.view.config.enableM2Skins) {
 			await this.progress.step('Loading item displays');
-
-			const itemDisplayInfo = new WDCReader('DBFilesClient/ItemDisplayInfo.dbc');
-			await itemDisplayInfo.parse();
-
-			for (const itemRow of itemDisplayInfo.getAllRows().values()) {
-				itemRow.ModelResourcesID = itemRow.ModelName.map(
-					modelName => m2Map[getDisplayItemBaseName(modelName)] || 0
-				);
-
-				itemRow.ModelMaterialResourcesID = itemRow.ModelTexture.map(
-					textureName => blpMap[textureName.toLowerCase()] || 0
-				);
-			}
-
-			await DBItemDisplays.initializeItemDisplays(itemDisplayInfo);
+			await DBItemDisplays.initializeItemDisplays(await this.loadItemDisplayInfo());
 
 			await this.progress.step('Loading creature data');
 			const creatureDisplayInfo = new WDCReader('DBFilesClient/CreatureDisplayInfo.dbc');
@@ -274,6 +265,23 @@ class MPQ {
 			await this.progress.step();
 			await this.progress.step();
 		}
+	}
+
+	async loadItemDisplayInfo() {
+		const itemDisplayInfo = new WDCReader('DBFilesClient/ItemDisplayInfo.dbc');
+		await itemDisplayInfo.parse();
+
+		for (const itemRow of itemDisplayInfo.getAllRows().values()) {
+			itemRow.ModelResourcesID = itemRow.ModelName.map(
+				modelName => this.itemDisplayM2Map[getDisplayItemBaseName(modelName)] || 0
+			);
+
+			itemRow.ModelMaterialResourcesID = itemRow.ModelTexture.map(
+				textureName => this.itemDisplayBlpMap[textureName.toLowerCase()] || 0
+			);
+		}
+
+		return itemDisplayInfo;
 	}
 
 	/**
@@ -301,6 +309,107 @@ class MPQ {
 		*/
 	getBuildName() {
 		return this.buildVersion;
+	}
+
+	get remoteCASCProgressSteps() {
+		return this.remoteCASC == null ? 9 : 0;
+	}
+
+	async getRemoteCASC(progress) {
+		if (this.remoteCASC != null)
+			return this.remoteCASC;
+
+		const cdnTag = core.view.selectedCDNRegion.tag;
+
+		if (progress == null)
+			progress = this.progress;
+
+		try {
+			progress.step('Loading remote CASC from CDN...');
+
+			const cascSource = new CASCRemote(cdnTag);
+			await cascSource.init();
+			cascSource.progress = progress;
+
+			// No builds available, likely CDN is not available.
+			if (cascSource.builds.length === 0)
+				throw new Error('No builds available.');
+
+			const buildIndex = 0;
+			await cascSource.preload(buildIndex);
+			await cascSource.loadEncoding();
+			await cascSource.loadRoot();
+
+			this.remoteCASC = cascSource;
+		} catch (e) {
+			core.setToast('error', util.format('There was an error loading remote CASC from Blizzard\'s %s CDN.', cdnTag.toUpperCase()), null, -1);
+			log.write('Failed to load remote CASC source: %s', e.message);
+		}
+
+		return this.remoteCASC;
+	}
+
+	async loadItems(itemSlotsIgnored) {
+		log.write('Loading MPQ items');
+
+		const progress = core.createProgress(2 + this.remoteCASCProgressSteps);
+
+		let itemSparseRows;
+
+		const cascSource = await this.getRemoteCASC(progress);
+		if (cascSource != null) {
+			const itemSparseFile = await cascSource.getFile(1572924, true, false, true);
+			const itemSparse = new WDCReader('DBFilesClient/ItemSparse.db2');
+			await itemSparse.parse(itemSparseFile.readBuffer());
+			itemSparseRows = itemSparse.getAllRows();
+		}
+
+		await progress.step('Loading item display info...');
+		const itemDisplayInfo = await this.loadItemDisplayInfo();
+
+		await progress.step('Loading item database...');
+		const itemDB = new WDCReader('DBFilesClient/Item.dbc');
+		await itemDB.parse();
+
+		const items = [];
+		const unnamedItems = [];
+
+		for (const [itemID, itemRow] of itemDB.getAllRows()) {
+			if (itemSlotsIgnored.includes(itemRow.inventoryType))
+				continue;
+
+			let materials = null;
+			let models = null;
+			let IconFileDataID = 0;
+			const itemDisplayInfoRow = itemDisplayInfo.getRow(itemRow.DisplayInfoID);
+
+			if (itemDisplayInfoRow !== null) {
+				IconFileDataID = listfile.getByFilename(`interface/icons/${itemDisplayInfoRow.InventoryIcon[0]}.blp`) ?? 0;
+				materials = [];
+				models = [];
+
+				materials.push(...itemDisplayInfoRow.ModelMaterialResourcesID);
+				models.push(...itemDisplayInfoRow.ModelResourcesID);
+
+				materials = materials.filter(e => e !== 0);
+				models = models.filter(e => e !== 0);
+			}
+
+			if (itemSparseRows?.has(itemID)) {
+				const itemSparseRow = {
+					...itemSparseRows.get(itemID),
+					IconFileDataID,
+				};
+				items.push([itemID, itemSparseRow, null, materials, models]);
+			}	else {
+				unnamedItems.push([itemID, itemRow, null, null, null]);
+			}
+		}
+
+		if (core.view.config.itemViewerShowAll || itemSparseRows == null)
+			return items.concat(unnamedItems);
+
+		return items;
 	}
 }
 
