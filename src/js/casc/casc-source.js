@@ -164,10 +164,14 @@ class CASC {
 	 */
 	async loadTables() {
 		await this.progress.step('Loading model file data');
-		await DBModelFileData.initializeModelFileData();
+		const modelFileData = new WDCReader('DBFilesClient/ModelFileData.db2');
+		await modelFileData.parse();
+		await DBModelFileData.initializeModelFileData(modelFileData);
 
 		await this.progress.step('Loading texture file data');
-		await DBTextureFileData.initializeTextureFileData();
+		const textureFileData = new WDCReader('DBFilesClient/TextureFileData.db2');
+		await textureFileData.parse();
+		await DBTextureFileData.initializeTextureFileData(textureFileData);
 
 		// Once the above two tables have loaded, ingest fileDataIDs as
 		// unknown entries to the listfile.
@@ -180,7 +184,9 @@ class CASC {
 
 		if (core.view.config.enableM2Skins) {
 			await this.progress.step('Loading item displays');
-			await DBItemDisplays.initializeItemDisplays();
+			const itemDisplayInfo = new WDCReader('DBFilesClient/ItemDisplayInfo.db2');
+			await itemDisplayInfo.parse();
+			await DBItemDisplays.initializeItemDisplays(itemDisplayInfo);
 
 			await this.progress.step('Loading creature data');
 			const creatureDisplayInfo = new WDCReader('DBFilesClient/CreatureDisplayInfo.db2');

@@ -5,7 +5,6 @@
  */
 
 const log = require('../../log');
-const WDCReader = require('../WDCReader');
 
 const modelResIDToFileDataID = new Map();
 const fileDataIDs = new Set();
@@ -13,10 +12,8 @@ const fileDataIDs = new Set();
 /**
  * Initialize model file data from ModelFileData.db2
  */
-const initializeModelFileData = async () => {
+const initializeModelFileData = async (modelFileData) => {
 	log.write('Loading model mapping...');
-	const modelFileData = new WDCReader('DBFilesClient/ModelFileData.db2');
-	await modelFileData.parse();
 
 	// Using the texture mapping, map all model fileDataIDs to used textures.
 	for (const [modelFileDataID, modelFileDataRow] of modelFileData.getAllRows()) {

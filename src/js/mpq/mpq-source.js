@@ -15,7 +15,10 @@ const MPQReader = require('./mpq');
 const BufferWrapper = require('../buffer');
 const WDCReader = require('../db/WDCReader');
 const BuildCache = require('../casc/build-cache');
+const DBModelFileData = require('../db/caches/DBModelFileData');
+const DBTextureFileData = require('../db/caches/DBTextureFileData');
 const DBCreatures = require('../db/caches/DBCreatures');
+const DBItemDisplays = require('../db/caches/DBItemDisplays');
 
 const compareMPQName = (...ab) => {
 	ab = ab.map(t => {
@@ -27,6 +30,33 @@ const compareMPQName = (...ab) => {
 	})
 
 	return ab[0].localeCompare(ab[1]);
+}
+
+const getDisplayItemBaseName = (fileName) => {
+	fileName = fileName.toLowerCase();
+	const dotIdx = fileName.lastIndexOf('.');
+	let mode = 'm2';
+	if (dotIdx !== -1) {
+		if (fileName.substring(dotIdx) === '.mdx')
+			mode = 'mdx';
+
+		fileName = fileName.substring(0, dotIdx);
+	}
+
+	const firstPartIdx = fileName.indexOf('_');
+	if (firstPartIdx === -1)
+		return fileName;
+
+	const firstPart = fileName.substring(0, firstPartIdx);
+	switch (firstPart) {
+		case 'lshoulder':
+		case 'rshoulder':
+			return fileName.substring(1);
+		case 'helm':
+			return mode === 'mdx' ? fileName : fileName.substring(0, fileName.lastIndexOf('_'));
+		default:
+			return fileName;
+	}
 }
 
 class MPQ {
@@ -112,7 +142,7 @@ class MPQ {
 		this.cache = new BuildCache(this.buildVersion);
 		await this.cache.init();
 
-		this.progress = core.createProgress(this.mpqFilePaths.length + 2);
+		this.progress = core.createProgress(this.mpqFilePaths.length + 3);
 
 		this.mpqFiles = new Map();
 		this.fileListMap = new Map();
@@ -161,7 +191,67 @@ class MPQ {
 	}
 
 	async loadTables() {
+		const modelFileData = new Map();
+		modelFileData.getAllRows = modelFileData.entries;
+
+		const textureFileData = new Map();
+		textureFileData.getAllRows = textureFileData.entries;
+
+		let resourceID = 0;
+		const m2Map = {};
+		const blpMap = {};
+
+		for (const filePath of this.fileListMap.keys()) {
+			const match = filePath.match(/([^/]+?)(\.mdx|\.m2|\.blp)$/i);
+			if (match == null)
+				continue;
+
+			let name = match[1];
+			const ext = match[2];
+			const map = ext === '.blp' ? blpMap : m2Map;
+
+			if (ext === '.m2' && filePath.startsWith('item/'))
+				name = getDisplayItemBaseName(name);
+
+			if (map[name] == null)
+				map[name] = ++resourceID;
+
+			const FileDataID = listfile.getByFilename(filePath);
+
+			if (ext === '.blp') {
+				textureFileData.set(
+					FileDataID,
+					{ FileDataID, MaterialResourcesID: map[name], UsageType: 0 }
+				);
+			} else {
+				modelFileData.set(
+					FileDataID,
+					{ FileDataID, ModelResourcesID: map[name] }
+				);
+			}
+		}
+
+		await DBModelFileData.initializeModelFileData(modelFileData);
+		await DBTextureFileData.initializeTextureFileData(textureFileData);
+
 		if (core.view.config.enableM2Skins) {
+			await this.progress.step('Loading item displays');
+
+			const itemDisplayInfo = new WDCReader('DBFilesClient/ItemDisplayInfo.dbc');
+			await itemDisplayInfo.parse();
+
+			for (const itemRow of itemDisplayInfo.getAllRows().values()) {
+				itemRow.ModelResourcesID = itemRow.ModelName.map(
+					modelName => m2Map[getDisplayItemBaseName(modelName)] || 0
+				);
+
+				itemRow.ModelMaterialResourcesID = itemRow.ModelTexture.map(
+					textureName => blpMap[textureName.toLowerCase()] || 0
+				);
+			}
+
+			await DBItemDisplays.initializeItemDisplays(itemDisplayInfo);
+
 			await this.progress.step('Loading creature data');
 			const creatureDisplayInfo = new WDCReader('DBFilesClient/CreatureDisplayInfo.dbc');
 			await creatureDisplayInfo.parse();
@@ -181,6 +271,7 @@ class MPQ {
 
 			await DBCreatures.initializeCreatureData(creatureDisplayInfo, creatureModelData, new Map());
 		} else {
+			await this.progress.step();
 			await this.progress.step();
 		}
 	}

@@ -5,7 +5,6 @@
  */
 
 const log = require('../../log');
-const WDCReader = require('../WDCReader');
 const DBModelFileData = require('./DBModelFileData');
 const DBTextureFileData = require('./DBTextureFileData');
 
@@ -14,10 +13,8 @@ const itemDisplays = new Map();
 /**
  * Initialize item displays from ItemDisplayInfo.db2
  */
-const initializeItemDisplays = async () => {
+const initializeItemDisplays = async (itemDisplayInfo) => {
 	log.write('Loading item textures...');
-	const itemDisplayInfo = new WDCReader('DBFilesClient/ItemDisplayInfo.db2');
-	await itemDisplayInfo.parse();
 
 	// Using the texture mapping, map all model fileDataIDs to used textures.
 	for (const [itemDisplayInfoID, itemDisplayInfoRow] of itemDisplayInfo.getAllRows()) {
