@@ -209,7 +209,7 @@ class ADTExporter {
 	 * @param {number} textureRes
 	 * @param {Set|undefined} gameObjects Additional game objects to export.
 	 * @param {ExportHelper} helper
-	 * @returns {string}
+	 * @returns {Promise<string>}
 	 */
 	async export(dir, quality, gameObjects, helper) {
 		const casc = core.view.casc;
