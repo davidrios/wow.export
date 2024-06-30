@@ -27,7 +27,7 @@ const compareMPQName = (...ab) => {
 		t = t.split('.')[0];
 		if (t.indexOf('-') === -1) 
 			t = t + '-0';
-    
+
 		return t;
 	})
 
@@ -299,6 +299,9 @@ class MPQ {
 	 * @param {string} fileName 
 	 */
 	async getFileByName(fileName) {
+		if (fileName.endsWith('.db2'))
+			fileName = fileName.replace('.db2', '.dbc').toLowerCase();
+
 		const info = this.fileListMap.get(fileName.toLowerCase());
 		return await info.mpq.readFile(info.filePath);
 	}

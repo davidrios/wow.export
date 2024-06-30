@@ -28,7 +28,7 @@ class M2Exporter {
 	 * @param {number} fileDataID
 	 */
 	constructor(data, variantTextures, fileDataID) {
-		this.m2 = new M2Loader(data, listfile.getByID(fileDataID));
+		this.m2 = new M2Loader(data, fileDataID);
 		this.fileDataID = fileDataID;
 		this.variantTextures = variantTextures;
 		this.dataTextures = new Map();
@@ -56,7 +56,7 @@ class M2Exporter {
 	 * @param {MTLWriter} mtl
 	 * @param {ExportHelper} helper
 	 * @param {boolean} [fullTexPaths=false]
-	 * @returns {Map<number, string>}
+	 * @returns {Promise<Map<number, string>>}
 	 */
 	async exportTextures(out, raw = false, mtl = null, helper, fullTexPaths = false) {
 		const config = core.view.config;

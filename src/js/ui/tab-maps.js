@@ -21,11 +21,29 @@ const FileWriter = require('../file-writer');
 let selectedMapID;
 let selectedMapDir;
 let selectedWDT;
+let md5Translate;
 
 const TILE_SIZE = constants.GAME.TILE_SIZE;
 const MAP_OFFSET = constants.GAME.MAP_OFFSET;
 
 let gameObjectsDB2 = null;
+
+const loadMd5Translate = async () => {
+	md5Translate = {};
+	const data = await core.view.casc.getFileByName('textures/minimap/md5translate.trs');
+	let dataTable = data.readString(undefined, 'utf8');
+	if (!dataTable.startsWith('dir:'))
+		throw new Error('invalid md5translate file');
+
+	dataTable = dataTable.split('\r\n');
+	for (const line of dataTable) {
+		if (line.startsWith('dir:'))
+			continue
+
+		const [name, hash] = line.split('\t');
+		md5Translate[name.toLowerCase()] = hash;
+	}
+}
 
 /**
  * Load a map into the map viewer.
@@ -88,7 +106,16 @@ const loadMapTile = async (x, y, size) => {
 		// Attempt to load the requested tile from CASC.
 		const paddedX = x.toString().padStart(2, '0');
 		const paddedY = y.toString().padStart(2, '0');
-		const tilePath = util.format('world/minimaps/%s/map%s_%s.blp', selectedMapDir, paddedX, paddedY);
+		let tilePath;
+		if (md5Translate == null) {
+			tilePath = util.format('world/minimaps/%s/map%s_%s.blp', selectedMapDir, paddedX, paddedY);
+			if (!listfile.getByFilename(tilePath))
+				await loadMd5Translate();
+		}
+
+		if (md5Translate != null)
+			tilePath = 'textures/minimap/' + md5Translate[util.format('%s\\map%s_%s.blp', selectedMapDir, paddedX, paddedY).toLowerCase()];
+
 		const data = await core.view.casc.getFileByName(tilePath, false, true);
 		const blp = new BLPFile(data);
 
@@ -120,7 +147,7 @@ const loadMapTile = async (x, y, size) => {
  */
 const collectGameObjects = async (mapID, filter) => {
 	// Load GameObjects.db2/GameObjectDisplayInfo.db2 on-demand.
-	if (gameObjectsDB2 === null) {
+	if (gameObjectsDB2 === null && listfile.getByFilename('DBFilesClient/GameObjects.db2') != null) {
 		const objTable = new WDCReader('DBFilesClient/GameObjects.db2');
 		await objTable.parse();
 
@@ -146,6 +173,9 @@ const collectGameObjects = async (mapID, filter) => {
 			}
 		}
 	}
+
+	if (gameObjectsDB2 == null)
+		gameObjectsDB2 = new Map();
 
 	const result = new Set();
 	const mapObjects = gameObjectsDB2.get(mapID);
@@ -292,6 +322,7 @@ core.events.once('screen-tab-maps', async () => {
 	}
 
 	core.view.mapViewerMaps = maps;
+	md5Translate = null;
 	
 	core.hideToast();
 	core.view.isBusy--;

@@ -76,9 +76,13 @@ const loadFoliageTables = async () => {
 	if (!hasLoadedFoliage) {
 		try {
 			dbDoodads = new WDCReader('DBFilesClient/GroundEffectDoodad.db2',);
-			dbTextures = new WDCReader('DBFilesClient/GroundEffectTexture.db2');
-
 			await dbDoodads.parse();
+			for (const entry of dbDoodads.rows.values()) {
+				if (entry.ModelFileID == null && entry.Doodadpath != null)
+					entry.ModelFileID = listfile.getByFilename(`world/nodxt/detail/${entry.Doodadpath}`);
+			}
+
+			dbTextures = new WDCReader('DBFilesClient/GroundEffectTexture.db2');
 			await dbTextures.parse();
 
 			hasLoadedFoliage = true;
@@ -266,14 +270,30 @@ class ADTExporter {
 			}
 		}
 
-		console.log(wdt);
 		const tilePrefix = prefix + '_' + this.tileID;
 
-		const maid = wdt.entries[this.tileIndex];
-		const rootFileDataID = maid.rootADT > 0 ? maid.rootADT : listfile.getByFilename(tilePrefix + '.adt');
-		const tex0FileDataID = maid.tex0ADT > 0 ? maid.tex0ADT : listfile.getByFilename(tilePrefix + '_tex0.adt');
-		const obj0FileDataID = maid.obj0ADT > 0 ? maid.obj0ADT : listfile.getByFilename(tilePrefix + '_obj0.adt');
-		const obj1FileDataID = maid.obj1ADT > 0 ? maid.obj1ADT : listfile.getByFilename(tilePrefix + '_obj1.adt');
+		let rootFileDataID;
+		let tex0FileDataID;
+		let obj0FileDataID;
+		let obj1FileDataID;
+		let maid;
+		let isMPQ = false;
+
+		if (wdt.entries == null) {
+			maid = {};
+			isMPQ = true;
+			const adtName = tilePrefix + '.adt';
+			rootFileDataID = listfile.getByFilename(adtName);
+			tex0FileDataID = listfile.getByFilename(adtName);
+			obj0FileDataID = listfile.getByFilename(adtName);
+			obj1FileDataID = listfile.getByFilename(adtName);
+		} else {
+			maid = wdt.entries[this.tileIndex];
+			rootFileDataID = maid.rootADT > 0 ? maid.rootADT : listfile.getByFilename(tilePrefix + '.adt');
+			tex0FileDataID = maid.tex0ADT > 0 ? maid.tex0ADT : listfile.getByFilename(tilePrefix + '_tex0.adt');
+			obj0FileDataID = maid.obj0ADT > 0 ? maid.obj0ADT : listfile.getByFilename(tilePrefix + '_obj0.adt');
+			obj1FileDataID = maid.obj1ADT > 0 ? maid.obj1ADT : listfile.getByFilename(tilePrefix + '_obj1.adt');
+		}
 
 		// Ensure we actually have the fileDataIDs for the files we need. LOD is not available on Classic.
 		if (rootFileDataID === 0 || tex0FileDataID === 0 || obj0FileDataID === 0 || obj1FileDataID === 0)
@@ -285,28 +305,39 @@ class ADTExporter {
 
 		if (config.mapsExportRaw) {
 			await rootFile.writeToFile(path.join(dir, this.mapDir + "_" + this.tileID + '.adt'));
-			await texFile.writeToFile(path.join(dir, this.mapDir + "_" + this.tileID + '_tex0.adt'));
-			await objFile.writeToFile(path.join(dir, this.mapDir + "_" + this.tileID + '_obj0.adt'));
 
-			// We only care about these when exporting raw files.
-			const obj1File = await casc.getFile(obj1FileDataID);
-			await obj1File.writeToFile(path.join(dir, this.mapDir + "_" + this.tileID + '_obj1.adt'));
+			if (!isMPQ) {
+				await texFile.writeToFile(path.join(dir, this.mapDir + "_" + this.tileID + '_tex0.adt'));
+				await objFile.writeToFile(path.join(dir, this.mapDir + "_" + this.tileID + '_obj0.adt'));
 
-			// LOD is not available on Classic.
-			if (maid.lodADT > 0) {
-				const lodFile = await casc.getFile(maid.lodADT);
-				await lodFile.writeToFile(path.join(dir, this.mapDir + "_" + this.tileID + '_lod.adt'));
-			}		
+				// We only care about these when exporting raw files.
+				const obj1File = await casc.getFile(obj1FileDataID);
+				await obj1File.writeToFile(path.join(dir, this.mapDir + "_" + this.tileID + '_obj1.adt'));
+
+				// LOD is not available on Classic.
+				if (maid.lodADT > 0) {
+					const lodFile = await casc.getFile(maid.lodADT);
+					await lodFile.writeToFile(path.join(dir, this.mapDir + "_" + this.tileID + '_lod.adt'));
+				}
+			}
 		}
 
-		const rootAdt = new ADTLoader(rootFile);
+		const rootAdt = new ADTLoader(rootFile, isMPQ);
 		rootAdt.loadRoot();
 
-		const texAdt = new ADTLoader(texFile);
+		const texAdt = new ADTLoader(texFile, isMPQ);
 		texAdt.loadTex(wdt);
+		if (texAdt.textures != null && texAdt.diffuseTextureFileDataIDs == null) {
+			texAdt.diffuseTextureFileDataIDs = Object.values(texAdt.textures).map(listfile.getByFilename);
+			texAdt.heightTextureFileDataIDs = [];
+		}
 
 		const objAdt = new ADTLoader(objFile);
 		objAdt.loadObj();
+		if (objAdt.m2Names != null) {
+			for (const model of objAdt.models)
+				model.FileDataID = listfile.getByFilename(objAdt.m2Names[model.mmidEntry]);
+		}
 
 		if (!config.mapsExportRaw) {
 			const vertices = new Array(16 * 16 * 145 * 3);
@@ -1083,7 +1114,7 @@ class ADTExporter {
 
 						try {
 							if (usingNames) {
-								fileName = objAdt.wmoNames[objAdt.wmoOffsets[model.mwidEntry]];
+								fileName = objAdt.wmoNames[model.mwidEntry];
 								fileDataID = listfile.getByFilename(fileName);
 							} else {
 								fileDataID = model.mwidEntry;

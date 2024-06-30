@@ -108,11 +108,13 @@ class WMOExporter {
 				if (isClassic) {
 					// Classic, lookup fileDataID using file name.
 					fileName = this.wmo.textureNames[materialTexture];
-					fileDataID = listfile.getByFilename(fileName) ?? 0;
+					if (fileName != null) {
+						fileDataID = listfile.getByFilename(fileName) ?? 0;
 
-					// Remove all whitespace from exported textures due to MTL incompatibility.
-					if (config.removePathSpaces)
-						fileName = fileName.replace(/\s/g, '');
+						// Remove all whitespace from exported textures due to MTL incompatibility.
+						if (config.removePathSpaces)
+							fileName = fileName.replace(/\s/g, '');
+					}
 				} else {
 					// Retail, use fileDataID directly.
 					fileDataID = materialTexture;

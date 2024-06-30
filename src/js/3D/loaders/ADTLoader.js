@@ -10,8 +10,9 @@ class ADTLoader {
 	 * Construct a new ADTLoader instance.
 	 * @param {BufferWrapper} data 
 	 */
-	constructor(data) {
+	constructor(data, isMPQ) {
 		this.data = data;
+		this.isMPQ = isMPQ;
 	}
 
 	/**
@@ -66,6 +67,98 @@ class ADTLoader {
 }
 
 const ADTChunkHandlers = {
+	parseMCNK(data, chunkSize, hasHeader, useHeaderChunks) {
+		const ofsStart = data.offset - 8;
+		const ofsEnd = data.offset + chunkSize;
+
+		let header = null;
+		if (hasHeader) {
+			header = {
+				flags: data.readUInt32LE(),
+				indexX: data.readUInt32LE(),
+				indexY: data.readUInt32LE(),
+				nLayers: data.readUInt32LE(),
+				nDoodadRefs: data.readUInt32LE(),
+				holesHighRes: data.readUInt8(8),
+				ofsMCLY: data.readUInt32LE(),
+				ofsMCRF: data.readUInt32LE(),
+				ofsMCAL: data.readUInt32LE(),
+				sizeAlpha: data.readUInt32LE(),
+				ofsMCSH: data.readUInt32LE(),
+				sizeShadows: data.readUInt32LE(),
+				areaID: data.readUInt32LE(),
+				nMapObjRefs: data.readUInt32LE(),
+				holesLowRes: data.readUInt16LE(),
+				unk1: data.readUInt16LE(),
+				lowQualityTextureMap: data.readInt16LE(8),
+				noEffectDoodad: data.readInt64LE(),
+				ofsMCSE: data.readUInt32LE(),
+				numMCSE: data.readUInt32LE(),
+				ofsMCLQ: data.readUInt32LE(),
+				sizeMCLQ: data.readUInt32LE(),
+				position: data.readFloatLE(3),
+				ofsMCCV: data.readUInt32LE(),
+				ofsMCLW: data.readUInt32LE(),
+				unk2: data.readUInt32LE(),
+
+				ofsStart,
+				ofsEnd,
+				ofsMCVT: 136,
+				ofsMCNR: 0,
+			};
+		}
+
+		const chunks = new Map();
+
+		if (useHeaderChunks) {
+			const ofsSubchunks = [
+				header.ofsMCVT,
+				header.ofsMCNR,
+				header.ofsMCLY,
+				header.ofsMCRF,
+				header.ofsMCAL,
+				header.ofsMCSH,
+				header.ofsMCSE,
+				header.ofsMCLQ,
+				header.ofsMCCV,
+				header.ofsMCLW,
+			];
+
+			// Read sub-chunks.
+			for (const subOfs of ofsSubchunks) {
+				if (subOfs === 0)
+					continue;
+
+				data.seek(ofsStart + subOfs);
+
+				const chunkID = data.readUInt32LE();
+				const subChunkSize = data.readUInt32LE();
+
+				chunks.set(chunkID, {offset: data.offset, size: subChunkSize});
+
+				if (subOfs === header.ofsMCVT) {
+					header.ofsMCNR = data.offset - header.ofsStart + subChunkSize;
+					ofsSubchunks[1] = header.ofsMCNR;
+				}
+			}
+		}
+		else {
+			// Read sub-chunks.
+			while (data.offset < ofsEnd) {
+				const chunkID = data.readUInt32LE();
+				const subChunkSize = data.readUInt32LE();
+				const nextChunkPos = data.offset + subChunkSize;
+
+				chunks.set(chunkID, {offset: data.offset, size: subChunkSize});
+
+				// Ensure that we start at the next chunk exactly.
+				data.seek(nextChunkPos);
+			}
+		}
+
+		return {header, chunks};
+	},
+
 	// MVER (Version)
 	0x4D564552: function(data) {
 		this.version = data.readUInt32LE();
@@ -75,48 +168,15 @@ const ADTChunkHandlers = {
 
 	// MCNK
 	0x4D434E4B: function(data, chunkSize) {
-		const endOfs = data.offset + chunkSize;
-		const chunk = this.chunks[this.chunkIndex++] = {
-			flags: data.readUInt32LE(),
-			indexX: data.readUInt32LE(),
-			indexY: data.readUInt32LE(),
-			nLayers: data.readUInt32LE(),
-			nDoodadRefs: data.readUInt32LE(),
-			holesHighRes: data.readUInt8(8),
-			ofsMCLY: data.readUInt32LE(),
-			ofsMCRF: data.readUInt32LE(),
-			ofsMCAL: data.readUInt32LE(),
-			sizeAlpha: data.readUInt32LE(),
-			ofsMCSH: data.readUInt32LE(),
-			sizeShadows: data.readUInt32LE(),
-			areaID: data.readUInt32LE(),
-			nMapObjRefs: data.readUInt32LE(),
-			holesLowRes: data.readUInt16LE(),
-			unk1: data.readUInt16LE(),
-			lowQualityTextureMap: data.readInt16LE(8),
-			noEffectDoodad: data.readInt64LE(),
-			ofsMCSE: data.readUInt32LE(),
-			numMCSE: data.readUInt32LE(),
-			ofsMCLQ: data.readUInt32LE(),
-			sizeMCLQ: data.readUInt32LE(),
-			position: data.readFloatLE(3),
-			ofsMCCV: data.readUInt32LE(),
-			ofsMCLW: data.readUInt32LE(),
-			unk2: data.readUInt32LE()
-		};
+		const mcnk = ADTChunkHandlers.parseMCNK(data, chunkSize, true, this.isMPQ);
+		const chunk = this.chunks[this.chunkIndex++] = mcnk.header;
 
 		// Read sub-chunks.
-		while (data.offset < endOfs) {
-			const chunkID = data.readUInt32LE();
-			const subChunkSize = data.readUInt32LE();
-			const nextChunkPos = data.offset + subChunkSize;
-
+		for (const [chunkID, info] of mcnk.chunks.entries()) {
+			data.seek(info.offset);
 			const handler = RootMCNKChunkHandlers[chunkID];
 			if (handler)
-				handler.call(chunk, data, subChunkSize);
-	
-			// Ensure that we start at the next chunk exactly.
-			data.seek(nextChunkPos);
+				handler.call(chunk, data, info.size);
 		}
 	},
 
@@ -311,21 +371,15 @@ const ADTTexChunkHandlers = {
 
 	// MCNK (Texture Chunks)
 	0x4D434E4B: function(data, chunkSize) {
-		const endOfs = data.offset + chunkSize;
+		const mcnk = ADTChunkHandlers.parseMCNK(data, chunkSize, this.isMPQ, this.isMPQ);
 		const chunk = this.texChunks[this.chunkIndex++] = {};
 
 		// Read sub-chunks.
-		while (data.offset < endOfs) {
-			const chunkID = data.readUInt32LE();
-			const subChunkSize = data.readUInt32LE();
-			const nextChunkPos = data.offset + subChunkSize;
-
+		for (const [chunkID, info] of mcnk.chunks.entries()) {
+			data.seek(info.offset);
 			const handler = TexMCNKChunkHandlers[chunkID];
 			if (handler)
-				handler.call(chunk, data, subChunkSize, this.wdt);
-	
-			// Ensure that we start at the next chunk exactly.
-			data.seek(nextChunkPos);
+				handler.call(chunk, data, info.size, this.wdt);
 		}
 	},
 
@@ -449,7 +503,7 @@ const ADTObjChunkHandlers = {
 
 	// MMDX (Doodad Filenames)
 	0x4D4D4458: function(data, chunkSize) {
-		this.m2Names = LoaderGenerics.ReadStringBlock(data, chunkSize);
+		this.m2Names = Object.values(LoaderGenerics.ReadStringBlock(data, chunkSize));
 	},
 
 	// MMID (M2 Offsets)
@@ -459,7 +513,7 @@ const ADTObjChunkHandlers = {
 
 	// MWMO (WMO Filenames)
 	0x4D574D4F: function(data, chunkSize) {
-		this.wmoNames = LoaderGenerics.ReadStringBlock(data, chunkSize);
+		this.wmoNames = Object.values(LoaderGenerics.ReadStringBlock(data, chunkSize));
 	},
 
 	// MWID (WMO Offsets)
