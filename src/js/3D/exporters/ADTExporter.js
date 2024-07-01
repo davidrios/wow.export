@@ -1187,7 +1187,7 @@ class ADTExporter {
 								RotationY: model.rotation[1],
 								RotationZ: model.rotation[2],
 								RotationW: 0,
-								ScaleFactor: model.scale / 1024,
+								ScaleFactor: isMPQ ? 1 : model.scale / 1024,
 								ModelId: model.uniqueId,
 								Type: 'wmo',
 								FileDataID: fileDataID,
