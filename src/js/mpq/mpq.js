@@ -85,14 +85,22 @@ const decrypt = (data, key) => {
 	return result;
 }
 
-const decompress = (data) => {
-	const compressionType = data.readUInt8();
-	if (compressionType === 2)
-		return new BufferWrapper(zlib.inflateSync(data.readBuffer().raw))
-	else if (compressionType === 16)
-		throw new Error(`Bz2 compression not supported yet.`);
+// const MPQ_COMPRESSION_HUFFMANN = 0x01;
+const MPQ_COMPRESSION_ZLIB = 0x02;
+// const MPQ_COMPRESSION_PKWARE = 0x08;
+// const MPQ_COMPRESSION_BZIP2 = 0x10;
+// const MPQ_COMPRESSION_SPARSE = 0x20;
+// const MPQ_COMPRESSION_ADPCM_MONO = 0x40;
+// const MPQ_COMPRESSION_ADPCM_STEREO = 0x80;
 
-	throw new Error(`Unsupported compression type: ${compressionType}.`);
+const decompress = (compressionType, data) => {
+	switch (compressionType) {
+		case MPQ_COMPRESSION_ZLIB:
+			return new BufferWrapper(zlib.inflateSync(data.readBuffer().raw));
+
+		default:
+			throw new Error(`Unsupported compression type: ${compressionType}.`);
+	}
 }
 
 const hashTableEntry = (data) => {
@@ -215,8 +223,10 @@ class MPQReader {
 		const isCompressed = (blockEntry.flags & MPQ_FILE_COMPRESS) === MPQ_FILE_COMPRESS;
 
 		if ((blockEntry.flags & MPQ_FILE_SINGLE_UNIT) === MPQ_FILE_SINGLE_UNIT) {
-			if (isCompressed && blockEntry.size > blockEntry.archiveSize)
-				fileData = decompress(fileData);
+			if (isCompressed && blockEntry.size > blockEntry.archiveSize) {
+				const firstByte = fileData.readUInt8();
+				fileData = decompress(firstByte, fileData);
+			}
 
 			return fileData;
 		}
@@ -229,11 +239,20 @@ class MPQReader {
 			positions.push(fileData.readUInt32LE());
 		
 		const result = BufferWrapper.alloc(blockEntry.size);
+		let comprAlgo;
 		for (let i = 0; i < sectors; i++) {
 			fileData.seek(positions[i]);
 			let sector = fileData.readBuffer(positions[i + 1] - positions[i]);
-			if (isCompressed && sector.byteLength > 0)
-				sector = decompress(sector);
+			if (isCompressed && sector.byteLength > 0 && blockEntry.size > blockEntry.archiveSize) {
+				const firstByte = sector.readUInt8();
+				if (comprAlgo == null)
+					comprAlgo = firstByte;
+
+				if (comprAlgo === firstByte)
+					sector = decompress(comprAlgo, sector);
+				else
+					sector.move(-1);
+			}
 
 			result.writeBuffer(sector);
 		}
