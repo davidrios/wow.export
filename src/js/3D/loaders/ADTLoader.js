@@ -67,7 +67,7 @@ class ADTLoader {
 }
 
 const ADTChunkHandlers = {
-	parseMCNK(data, chunkSize, hasHeader, useHeaderChunks) {
+	parseMCNK(data, chunkSize, hasHeader, mcnrHasPadding) {
 		const ofsStart = data.offset - 8;
 		const ofsEnd = data.offset + chunkSize;
 
@@ -110,50 +110,19 @@ const ADTChunkHandlers = {
 
 		const chunks = new Map();
 
-		if (useHeaderChunks) {
-			const ofsSubchunks = [
-				header.ofsMCVT,
-				header.ofsMCNR,
-				header.ofsMCLY,
-				header.ofsMCRF,
-				header.ofsMCAL,
-				header.ofsMCSH,
-				header.ofsMCSE,
-				header.ofsMCLQ,
-				header.ofsMCCV,
-				header.ofsMCLW,
-			];
+		while (data.offset < ofsEnd) {
+			const chunkID = data.readUInt32LE();
+			const subChunkSize = data.readUInt32LE();
 
-			// Read sub-chunks.
-			for (const subOfs of ofsSubchunks) {
-				if (subOfs === 0)
-					continue;
+			if (chunkID === 0x4D434E52 && mcnrHasPadding)
+				data.move(13);
 
-				data.seek(ofsStart + subOfs);
+			const nextChunkPos = data.offset + subChunkSize;
 
-				const chunkID = data.readUInt32LE();
-				const subChunkSize = data.readUInt32LE();
+			chunks.set(chunkID, {offset: data.offset, size: subChunkSize});
 
-				chunks.set(chunkID, {offset: data.offset, size: subChunkSize});
-
-				if (subOfs === header.ofsMCVT) {
-					header.ofsMCNR = data.offset - header.ofsStart + subChunkSize;
-					ofsSubchunks[1] = header.ofsMCNR;
-				}
-			}
-		}
-		else {
-			// Read sub-chunks.
-			while (data.offset < ofsEnd) {
-				const chunkID = data.readUInt32LE();
-				const subChunkSize = data.readUInt32LE();
-				const nextChunkPos = data.offset + subChunkSize;
-
-				chunks.set(chunkID, {offset: data.offset, size: subChunkSize});
-
-				// Ensure that we start at the next chunk exactly.
-				data.seek(nextChunkPos);
-			}
+			// Ensure that we start at the next chunk exactly.
+			data.seek(nextChunkPos);
 		}
 
 		return {header, chunks};
