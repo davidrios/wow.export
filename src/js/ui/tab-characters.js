@@ -16,6 +16,7 @@ const FileWriter = require('../file-writer');
 const listfile = require('../loader/listfile');
 const realmlist = require('../casc/realmlist');
 const DBCreatures = require('../db/caches/DBCreatures');
+const DBTextureFileData = require('../db/caches/DBTextureFileData');
 
 let camera;
 let scene;
@@ -26,28 +27,7 @@ const renderGroup = new THREE.Group();
 
 let activeRenderer;
 let activeModel;
-
-// TODO: Need to make these accessible while in the character tab. Not sure how scope works here.
-const chrModelIDToFileDataID = new Map();
-const chrModelIDToTextureLayoutID = new Map();
-const optionsByChrModel = new Map();
-const optionToChoices = new Map();
-const defaultOptions = new Array();
-
-const chrRaceMap = new Map();
-const chrRaceXChrModelMap = new Map();
-
-const choiceToGeoset = new Map();
-const choiceToChrCustMaterialID = new Map();
-const choiceToSkinnedModel = new Map();
-const unsupportedChoices = new Array();
-
-const geosetMap = new Map();
-const chrCustMatMap = new Map();
-const chrModelTextureLayerMap = new Map();
-const charComponentTextureSectionMap = new Map();
-const chrModelMaterialMap = new Map();
-const chrCustSkinnedModelMap = new Map();
+let chrData;
 
 const skinnedModelRenderers = new Map();
 const skinnedModelMeshes = new Set();
@@ -99,11 +79,11 @@ async function updateActiveCustomization() {
 	const selection = core.view.chrCustActiveChoices;
 	for (const activeChoice of selection) {
 		// Update all geosets for this option.
-		const availableChoices = optionToChoices.get(activeChoice.optionID);
+		const availableChoices = chrData.optionToChoices.get(activeChoice.optionID);
 
 		for (const availableChoice of availableChoices) {
-			const chrCustGeoID = choiceToGeoset.get(availableChoice.id);
-			const geoset = geosetMap.get(chrCustGeoID);
+			const chrCustGeoID = chrData.choiceToGeoset.get(availableChoice.id);
+			const geoset = chrData.geosetMap.get(chrCustGeoID);
 
 			if (geoset !== undefined) {
 				for (const availableGeoset of core.view.chrCustGeosets) {
@@ -121,7 +101,7 @@ async function updateActiveCustomization() {
 		}
 
 		// Update material (if applicable)
-		const chrCustMatIDs = choiceToChrCustMaterialID.get(activeChoice.choiceID);
+		const chrCustMatIDs = chrData.choiceToChrCustMaterialID.get(activeChoice.choiceID);
 
 		if (chrCustMatIDs != undefined) {
 			for (const chrCustMatID of chrCustMatIDs) {
@@ -131,11 +111,11 @@ async function updateActiveCustomization() {
 						continue;
 				}
 
-				const chrCustMat = chrCustMatMap.get(chrCustMatID.ChrCustomizationMaterialID);
+				const chrCustMat = chrData.chrCustMatMap.get(chrCustMatID.ChrCustomizationMaterialID);
 				const chrModelTextureTarget = chrCustMat.ChrModelTextureTargetID;
 
 				// Find row in ChrModelTextureLayer that matches ChrModelTextureTargetID and current CharComponentTextureLayoutID
-				const chrModelTextureLayer = chrModelTextureLayerMap.get(currentCharComponentTextureLayoutID + "-" + chrModelTextureTarget);
+				const chrModelTextureLayer = chrData.chrModelTextureLayerMap.get(currentCharComponentTextureLayoutID + "-" + chrModelTextureTarget);
 				if (chrModelTextureLayer === undefined) {
 					console.log("Unable to find ChrModelTextureLayer for ChrModelTextureTargetID " + chrModelTextureTarget + " and CharComponentTextureLayoutID " + currentCharComponentTextureLayoutID)
 					// TODO: Investigate but continue for now, this breaks e.g. dwarven beards
@@ -143,7 +123,7 @@ async function updateActiveCustomization() {
 				}
 
 				// Find row in ChrModelMaterial based on chrModelTextureLayer.TextureType and current CharComponentTextureLayoutID
-				const chrModelMaterial = chrModelMaterialMap.get(currentCharComponentTextureLayoutID + "-" + chrModelTextureLayer.TextureType);
+				const chrModelMaterial = chrData.chrModelMaterialMap.get(currentCharComponentTextureLayoutID + "-" + chrModelTextureLayer.TextureType);
 				if (chrModelMaterial === undefined)
 					console.log("Unable to find ChrModelMaterial for TextureType " + chrModelTextureLayer.TextureType + " and CharComponentTextureLayoutID " + currentCharComponentTextureLayoutID)
 
@@ -164,7 +144,7 @@ async function updateActiveCustomization() {
 				if (chrModelTextureLayer.TextureSectionTypeBitMask == -1) {
 					charComponentTextureSection = { X: 0, Y: 0, Width: chrModelMaterial.Width, Height: chrModelMaterial.Height };
 				} else {
-					const charComponentTextureSectionResults = charComponentTextureSectionMap.get(currentCharComponentTextureLayoutID);
+					const charComponentTextureSectionResults = chrData.charComponentTextureSectionMap.get(currentCharComponentTextureLayoutID);
 					for (const charComponentTextureSectionRow of charComponentTextureSectionResults) {
 						// Check TextureSectionTypeBitMask to see if it contains SectionType (1-14) 
 						if ((1 << charComponentTextureSectionRow.SectionType) & chrModelTextureLayer.TextureSectionTypeBitMask) {
@@ -250,11 +230,11 @@ async function updateChrRaceList() {
 	core.view.chrCustRaces = [];
 
 	// Build character model list.
-	for (const [chrRaceID, chrRaceInfo] of chrRaceMap) {
-		if (!chrRaceXChrModelMap.has(chrRaceID))
+	for (const [chrRaceID, chrRaceInfo] of chrData.chrRaceMap) {
+		if (!chrData.chrRaceXChrModelMap.has(chrRaceID))
 			continue;
 
-		const chrModels = chrRaceXChrModelMap.get(chrRaceID);
+		const chrModels = chrData.chrRaceXChrModelMap.get(chrRaceID);
 		for (const chrModelID of chrModels.values()) {
 			// If we're filtering NPC races, bail out.
 			if (!core.view.config.chrCustShowNPCRaces && chrRaceInfo.isNPCRace)
@@ -308,7 +288,7 @@ async function updateChrRaceList() {
 }
 
 async function updateChrModelList() {
-	const modelsForRace = chrRaceXChrModelMap.get(core.view.chrCustRaceSelection[0].id);
+	const modelsForRace = chrData.chrRaceXChrModelMap.get(core.view.chrCustRaceSelection[0].id);
 
 	// We'll do a quick check for the index of the last selected model.
 	// If it's valid, we'll try to select the same index for loading the next race models.
@@ -511,11 +491,11 @@ async function loadImportJSON(json) {
 	core.view.chrCustModelSelection = [core.view.chrCustModels[genderIndex]];
 
 	// Get correct ChrModel ID
-	const chrModelID = chrRaceXChrModelMap.get(playerRaceID).get(genderIndex);
+	const chrModelID = chrData.chrRaceXChrModelMap.get(playerRaceID).get(genderIndex);
 	core.view.chrImportChrModelID = chrModelID;
 
 	// Get available option IDs
-	const availableOptions = optionsByChrModel.get(chrModelID);
+	const availableOptions = chrData.optionsByChrModel.get(chrModelID);
 	const availableOptionsIDs = [];
 	for (const option of availableOptions)
 		availableOptionsIDs.push(option.id);
@@ -588,7 +568,7 @@ async function updateModelSelection() {
 	
 	console.log('Selection changed to ID ' + selected.id + ', label ' + selected.label);
 
-	const availableOptions = optionsByChrModel.get(selected.id);
+	const availableOptions = chrData.optionsByChrModel.get(selected.id);
 	if (availableOptions === undefined) {
 		console.log('No options available for this model.');
 		return;
@@ -609,9 +589,9 @@ async function updateModelSelection() {
 	state.chrCustOptionSelection.push(...availableOptions.slice(0, 1));
 
 	console.log("Set currentCharComponentTextureLayoutID to " + currentCharComponentTextureLayoutID);
-	currentCharComponentTextureLayoutID = chrModelIDToTextureLayoutID.get(selected.id);
+	currentCharComponentTextureLayoutID = chrData.chrModelIDToTextureLayoutID.get(selected.id);
 
-	const fileDataID = chrModelIDToFileDataID.get(selected.id);
+	const fileDataID = chrData.chrModelIDToFileDataID.get(selected.id);
 
 	// Check if the first file in the selection is "new".
 	if (!core.view.isBusy && fileDataID && activeModel !== fileDataID)
@@ -623,8 +603,8 @@ async function updateModelSelection() {
 		// For each available option we select the first choice ONLY if the option is a 'default' option.
 		// TODO: What do we do if the user doesn't want to select any choice anymore? Are "none" choices guaranteed for these options?
 		for (const option of availableOptions) {
-			const choices = optionToChoices.get(option.id);
-			if (defaultOptions.includes(option.id))
+			const choices = chrData.optionToChoices.get(option.id);
+			if (chrData.defaultOptions.includes(option.id))
 				state.chrCustActiveChoices.push({ optionID: option.id, choiceID: choices[0].id });
 		}
 	} else {
@@ -648,14 +628,14 @@ async function updateCustomizationType() {
 
 	const selected = selection[0];
 
-	const availableChoices = optionToChoices.get(selected.id);
+	const availableChoices = chrData.optionToChoices.get(selected.id);
 	if (availableChoices === undefined)
 		return;
 
 	core.view.chrCustUnsupportedWarning = false;
 
 	for (const choice of availableChoices) {
-		if (unsupportedChoices.includes(choice.id))
+		if (chrData.unsupportedChoices.includes(choice.id))
 			core.view.chrCustUnsupportedWarning = true;
 	}
 
@@ -683,38 +663,27 @@ async function updateCustomizationChoice() {
 	}
 }
 
-core.events.once('screen-tab-characters', async () => {
-	const state = core.view;
+async function loadCASCCharacters (progress) {
+	const chrModelIDToFileDataID = new Map();
+	const chrModelIDToTextureLayoutID = new Map();
+	const optionsByChrModel = new Map();
+	const optionToChoices = new Map();
+	const defaultOptions = new Array();
 
-	// Initialize a loading screen.
-	const progress = core.createProgress(15);
-	state.setScreen('loading');
-	state.isBusy++;
+	const chrRaceMap = new Map();
+	const chrRaceXChrModelMap = new Map();
 
-	await progress.step('Retrieving realmlist...');
-	await realmlist.load();
+	const choiceToGeoset = new Map();
+	const choiceToChrCustMaterialID = new Map();
+	const choiceToSkinnedModel = new Map();
+	const unsupportedChoices = new Array();
 
-	core.view.$watch('chrImportSelectedRegion', () => {
-		const realmList = state.realmList[state.chrImportSelectedRegion].map(realm => ({ label: realm.name, value: realm.slug }));
-		state.chrImportRealms = realmList;
-
-		if (state.chrImportSelectedRealm !== null && !realmList.find(realm => realm.value === state.chrImportSelectedRealm.value))
-			state.chrImportSelectedRealm = null;
-	});
-
-	state.chrImportRegions = Object.keys(state.realmList);
-	state.chrImportSelectedRegion = state.chrImportRegions[0];
-
-	await progress.step('Loading texture mapping...');
-	const tfdDB = new WDCReader('DBFilesClient/TextureFileData.db2');
-	await tfdDB.parse();
-	const tfdMap = new Map();
-	for (const tfdRow of tfdDB.getAllRows().values()) {
-		// Skip specular (1) and emissive (2)
-		if (tfdRow.UsageType != 0)
-			continue;
-		tfdMap.set(tfdRow.MaterialResourcesID, tfdRow.FileDataID);
-	}
+	const geosetMap = new Map();
+	const chrCustMatMap = new Map();
+	const chrModelTextureLayerMap = new Map();
+	const charComponentTextureSectionMap = new Map();
+	const chrModelMaterialMap = new Map();
+	const chrCustSkinnedModelMap = new Map();
 
 	await progress.step('Loading character models..');
 	const chrModelDB = new WDCReader('DBFilesClient/ChrModel.db2');
@@ -758,7 +727,10 @@ core.events.once('screen-tab-characters', async () => {
 				choiceToChrCustMaterialID.set(chrCustomizationElementRow.ChrCustomizationChoiceID, [{ ChrCustomizationMaterialID: chrCustomizationElementRow.ChrCustomizationMaterialID, RelatedChrCustomizationChoiceID: chrCustomizationElementRow.RelatedChrCustomizationChoiceID }]);
 
 			const matRow = chrCustMatDB.getRow(chrCustomizationElementRow.ChrCustomizationMaterialID);
-			chrCustMatMap.set(matRow.ID, {ChrModelTextureTargetID: matRow.ChrModelTextureTargetID, FileDataID: tfdMap.get(matRow.MaterialResourcesID)});
+			let FileDataID = DBTextureFileData.getTextureFDIDsByMatID(matRow.MaterialResourcesID);
+			if (FileDataID?.length > 0)
+				FileDataID = FileDataID[0];
+			chrCustMatMap.set(matRow.ID, { ChrModelTextureTargetID: matRow.ChrModelTextureTargetID, FileDataID });
 		}
 	}
 
@@ -873,6 +845,54 @@ core.events.once('screen-tab-characters', async () => {
 	await chrCustSkinnedModelDB.parse();
 	for (const [chrCustomizationSkinnedModelID, chrCustomizationSkinnedModelRow] of chrCustSkinnedModelDB.getAllRows())
 		chrCustSkinnedModelMap.set(chrCustomizationSkinnedModelID, chrCustomizationSkinnedModelRow);
+
+	return {
+		chrModelIDToFileDataID,
+		chrModelIDToTextureLayoutID,
+		optionsByChrModel,
+		optionToChoices,
+		defaultOptions,
+		chrRaceMap,
+		chrRaceXChrModelMap,
+		choiceToGeoset,
+		choiceToChrCustMaterialID,
+		choiceToSkinnedModel,
+		unsupportedChoices,
+		geosetMap,
+		chrCustMatMap,
+		chrModelTextureLayerMap,
+		charComponentTextureSectionMap,
+		chrModelMaterialMap,
+		chrCustSkinnedModelMap,
+	}
+}
+
+core.events.once('screen-tab-characters', async () => {
+	const state = core.view;
+
+	// Initialize a loading screen.
+	const progress = core.createProgress(core.view.dataType === 'mpq' ? 1 : 14);
+	state.setScreen('loading');
+	state.isBusy++;
+
+	await progress.step('Retrieving realmlist...');
+	await realmlist.load();
+
+	core.view.$watch('chrImportSelectedRegion', () => {
+		const realmList = state.realmList[state.chrImportSelectedRegion].map(realm => ({ label: realm.name, value: realm.slug }));
+		state.chrImportRealms = realmList;
+
+		if (state.chrImportSelectedRealm !== null && !realmList.find(realm => realm.value === state.chrImportSelectedRealm.value))
+			state.chrImportSelectedRealm = null;
+	});
+
+	state.chrImportRegions = Object.keys(state.realmList);
+	state.chrImportSelectedRegion = state.chrImportRegions[0];
+
+	if (core.view.dataType === 'mpq')
+		chrData = await core.view.casc.loadCharacters(progress);
+	else
+		chrData = await loadCASCCharacters(progress);
 
 	await progress.step('Loading character shaders...');
 	await CharMaterialRenderer.init();

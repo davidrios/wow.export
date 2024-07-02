@@ -414,6 +414,49 @@ class MPQ {
 
 		return items;
 	}
+
+	async loadCharacters(progress) {
+		const chrModelIDToFileDataID = new Map();
+		const chrModelIDToTextureLayoutID = new Map();
+		const optionsByChrModel = new Map();
+		const optionToChoices = new Map();
+		const defaultOptions = new Array();
+
+		const chrRaceMap = new Map();
+		const chrRaceXChrModelMap = new Map();
+
+		const choiceToGeoset = new Map();
+		const choiceToChrCustMaterialID = new Map();
+		const choiceToSkinnedModel = new Map();
+		const unsupportedChoices = new Array();
+
+		const geosetMap = new Map();
+		const chrCustMatMap = new Map();
+		const chrModelTextureLayerMap = new Map();
+		const charComponentTextureSectionMap = new Map();
+		const chrModelMaterialMap = new Map();
+		const chrCustSkinnedModelMap = new Map();
+
+		return {
+			chrModelIDToFileDataID,
+			chrModelIDToTextureLayoutID,
+			optionsByChrModel,
+			optionToChoices,
+			defaultOptions,
+			chrRaceMap,
+			chrRaceXChrModelMap,
+			choiceToGeoset,
+			choiceToChrCustMaterialID,
+			choiceToSkinnedModel,
+			unsupportedChoices,
+			geosetMap,
+			chrCustMatMap,
+			chrModelTextureLayerMap,
+			charComponentTextureSectionMap,
+			chrModelMaterialMap,
+			chrCustSkinnedModelMap,
+		}
+	}
 }
 
 module.exports = MPQ;
