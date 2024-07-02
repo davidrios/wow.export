@@ -24,17 +24,20 @@ const initializeTextureFileData = async (textureFileData) => {
 		if (textureFileDataRow.UsageType !== 0)
 			continue;
 
-		matResIDToFileDataID.set(textureFileDataRow.MaterialResourcesID, textureFileDataID);
+		if (matResIDToFileDataID.has(textureFileDataRow.MaterialResourcesID))
+			matResIDToFileDataID.get(textureFileDataRow.MaterialResourcesID).push(textureFileDataID);
+		else
+			matResIDToFileDataID.set(textureFileDataRow.MaterialResourcesID, [textureFileDataID]);
 	}
 	log.write('Loaded texture mapping for %d materials', matResIDToFileDataID.size);
 };
 
 /**
- * Retrieve a texture file data ID by a material resource ID.
+ * Retrieves texture file data IDs by a material resource ID.
  * @param {number} matResID 
- * @returns {?number}
+ * @returns {?number[]}
  */
-const getTextureFileDataID = (matResID) => {
+const getTextureFDIDsByMatID = (matResID) => {
 	return matResIDToFileDataID.get(matResID);
 };
 
@@ -49,6 +52,6 @@ const getFileDataIDs = () => {
 
 module.exports = {
 	initializeTextureFileData,
-	getTextureFileDataID,
+	getTextureFDIDsByMatID,
 	getFileDataIDs
 };
