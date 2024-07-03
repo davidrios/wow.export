@@ -678,7 +678,7 @@ core.events.once('screen-tab-characters', async () => {
 	state.chrImportRegions = Object.keys(state.realmList);
 	state.chrImportSelectedRegion = state.chrImportRegions[0];
 
-	chrData = await core.view.casc.getCharactersInformation(progress);
+	chrData = await core.view.casc.getCharactersData(progress);
 
 	await progress.step('Loading character shaders...');
 	await CharMaterialRenderer.init();

@@ -416,7 +416,7 @@ class MPQ {
 		return items;
 	}
 
-	async getCharactersInformation(progress) {
+	async getCharactersData(progress) {
 		const chrModelIDToFileDataID = new Map();
 		const chrModelIDToTextureLayoutID = new Map();
 		const optionsByChrModel = new Map();
