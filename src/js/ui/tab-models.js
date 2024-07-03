@@ -9,7 +9,7 @@ const util = require('util');
 const path = require('path');
 const BufferWrapper = require('../buffer');
 const ExportHelper = require('../casc/export-helper');
-const listfile = require('../loader/listfile');
+const { stripFileEntry, formatUnknownFile } = require('../loader/listfile');
 const constants = require('../constants');
 const EncryptionError = require('../casc/blte-reader').EncryptionError;
 const FileWriter = require('../file-writer');
@@ -74,7 +74,7 @@ const clearTexturePreview = () => {
  * @param {string} name
  */
 const previewTextureByID = async (fileDataID, name) => {
-	const texture = listfile.getByID(fileDataID) ?? listfile.formatUnknownFile(fileDataID);
+	const texture = core.view.casc.listfile.getByID(fileDataID) ?? formatUnknownFile(fileDataID);
 
 	core.view.isBusy++;
 	core.setToast('progress', util.format('Loading %s, please wait...', texture), null, -1, false);
@@ -137,7 +137,7 @@ const previewModel = async (fileName) => {
 		selectedVariantTextureIDs.length = 0;
 		selectedSkinName = null;
 
-		const fileDataID = listfile.getByFilename(fileName);
+		const fileDataID = core.view.casc.listfile.getByFilename(fileName);
 		const file = await core.view.casc.getFile(fileDataID);
 		let isM2 = false;
 
@@ -159,7 +159,7 @@ const previewModel = async (fileName) => {
 			const displays = getModelDisplays(fileDataID);
 
 			const skinList = [];
-			let modelName = listfile.getByID(fileDataID);
+			let modelName = core.view.casc.listfile.getByID(fileDataID);
 			modelName = path.basename(modelName, 'm2');
 
 			for (const display of displays) {
@@ -169,7 +169,7 @@ const previewModel = async (fileName) => {
 				const texture = display.textures[0];
 
 				let cleanSkinName = '';
-				let skinName = listfile.getByID(texture);
+				let skinName = core.view.casc.listfile.getByID(texture);
 				if (skinName !== undefined) {
 					// Display the texture name without path/extension.
 					skinName = path.basename(skinName, '.blp');
@@ -279,7 +279,7 @@ const getVariantTextureIDs = (fileName) => {
 		return selectedVariantTextureIDs;
 	} else {
 		// Resolve default skins for auxiliary selections.
-		const fileDataID = listfile.getByFilename(fileName);
+		const fileDataID = core.view.casc.listfile.getByFilename(fileName);
 		const displays = getModelDisplays(fileDataID);
 
 		return displays.find(e => e.textures.length > 0)?.textures ?? [];
@@ -335,10 +335,10 @@ const exportFiles = async (files, isLocal = false, exportID = -1) => {
 
 			if (typeof fileEntry === 'number') {
 				fileDataID = fileEntry;
-				fileName = listfile.getByID(fileDataID);
+				fileName = core.view.casc.listfile.getByID(fileDataID);
 			} else {
-				fileName = listfile.stripFileEntry(fileEntry);
-				fileDataID = listfile.getByFilename(fileName);
+				fileName = stripFileEntry(fileEntry);
+				fileDataID = core.view.casc.listfile.getByFilename(fileName);
 			}
 
 			const fileManifest = [];
@@ -355,11 +355,11 @@ const exportFiles = async (files, isLocal = false, exportID = -1) => {
 
 					if (magic === constants.MAGIC.MD20 || magic === constants.MAGIC.MD21) {
 						fileType = MODEL_TYPE_M2;
-						fileName = listfile.formatUnknownFile(fileDataID, '.m2');
+						fileName = formatUnknownFile(fileDataID, '.m2');
 					} else {
 						// Naively assume that if it's not M2, then it's WMO. This could be better.
 						fileType = MODEL_TYPE_WMO;
-						fileName = listfile.formatUnknownFile(fileDataID, '.wmo');
+						fileName = formatUnknownFile(fileDataID, '.wmo');
 					}
 				} else {
 					// We already have a filename for this entry, so we can assume the file type via extension.
@@ -494,7 +494,7 @@ const updateListfile = () => {
 		modelExt.push(['.wmo', constants.LISTFILE_MODEL_FILTER]);
 
 	// Create a new listfile using the given configuration.
-	core.view.listfileModels = listfile.getFilenamesByExtension(modelExt, core.view.config.listfileShowFileDataIDs);
+	core.view.listfileModels = core.view.casc.listfile.getFilenamesByExtension(modelExt, core.view.config.listfileShowFileDataIDs);
 };
 
 // Register a drop handler for M2 files.
@@ -586,7 +586,7 @@ core.registerLoadFunc(async () => {
 			return;
 
 		// Check if the first file in the selection is "new".
-		const first = listfile.stripFileEntry(selection[0]);
+		const first = stripFileEntry(selection[0]);
 		if (!core.view.isBusy && first && activePath !== first)
 			previewModel(first);
 	});

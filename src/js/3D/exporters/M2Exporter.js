@@ -7,7 +7,7 @@ const core = require('../../core');
 const log = require('../../log');
 const path = require('path');
 const generics = require('../../generics');
-const listfile = require('../../loader/listfile');
+const { formatUnknownFile } = require('../../loader/listfile');
 
 const BLPFile = require('../../casc/blp');
 const M2Loader= require('../loaders/M2Loader');
@@ -141,7 +141,7 @@ class M2Exporter {
 
 					// Default MTL name to the file ID (prefixed for Maya).
 					let matName = 'mat_' + texFileDataID;
-					let fileName = listfile.getByID(texFileDataID);
+					let fileName = core.view.casc.listfile.getByID(texFileDataID);
 
 					if (fileName !== undefined) {
 						matName = 'mat_' + path.basename(fileName.toLowerCase(), '.blp');
@@ -159,7 +159,7 @@ class M2Exporter {
 								fileName = ExportHelper.replaceExtension(fileName, '.png');
 						} else {
 							// Handle unknown files.
-							fileName = listfile.formatUnknownFile(texFile);
+							fileName = formatUnknownFile(texFile);
 						}
 
 						texPath = ExportHelper.getExportPath(fileName);
@@ -349,6 +349,7 @@ class M2Exporter {
 		await this.m2.load();
 		const skin = await this.m2.getSkin(0);
 
+		const listfile = core.view.casc.listfile;
 		const config = core.view.config;
 		const exportMeta = core.view.config.exportM2Meta;
 		const exportBones = core.view.config.exportM2Bones;
@@ -521,6 +522,7 @@ class M2Exporter {
 	 */
 	async exportRaw(out, helper, fileManifest) {
 		const casc = core.view.casc;
+		const listfile = casc.listfile;
 		const config = core.view.config;
 
 		const manifestFile = ExportHelper.replaceExtension(out, '.manifest.json');

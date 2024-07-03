@@ -9,7 +9,7 @@ const log = require('../log');
 const ExportHelper = require('../casc/export-helper');
 const generics = require('../generics');
 const constants = require('../constants');
-const listfile = require('../loader/listfile');
+const { stripFileEntry } = require('../loader/listfile');
 
 let isDirty = true;
 
@@ -22,13 +22,13 @@ const computeRawFiles = async () => {
 			await generics.redraw();
 
 			const rootEntries = core.view.casc.getValidRootEntries();
-			core.view.listfileRaw = listfile.formatEntries(rootEntries);
+			core.view.listfileRaw = core.view.casc.listfile.formatEntries(rootEntries);
 			core.setToast('success', util.format('Found %d files in the game client', core.view.listfileRaw.length));
 		} else {
 			core.setToast('progress', 'Scanning game client for all known files...');
 			await generics.redraw();
 
-			core.view.listfileRaw = listfile.getFullListfile();
+			core.view.listfileRaw = core.view.casc.listfile.getFullListfile();
 			core.setToast('success', util.format('Found %d known files in the game client', core.view.listfileRaw.length));
 		}
 	}
@@ -50,7 +50,7 @@ core.events.on('click-detect-raw', async () => {
 	
 	const filteredSelection = [];
 	for (let fileName of userSelection) {
-		fileName = listfile.stripFileEntry(fileName);
+		fileName = stripFileEntry(fileName);
 		const match = fileName.match(/^unknown\/(\d+)(\.[a-zA-Z_]+)?$/);
 
 		if (match)
@@ -86,7 +86,7 @@ core.events.on('click-detect-raw', async () => {
 	}
 
 	if (extensionMap.size > 0) {
-		listfile.ingestIdentifiedFiles(extensionMap);
+		core.view.casc.listfile.ingestIdentifiedFiles(extensionMap);
 		await computeRawFiles();
 
 		if (extensionMap.size === 1) {
@@ -121,7 +121,7 @@ core.events.on('click-export-raw', async () => {
 		if (helper.isCancelled())
 			return;
 
-		fileName = listfile.stripFileEntry(fileName);
+		fileName = stripFileEntry(fileName);
 		const exportPath = ExportHelper.getExportPath(fileName);
 
 		if (overwriteFiles || !await generics.fileExists(exportPath)) {

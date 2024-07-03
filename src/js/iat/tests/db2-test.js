@@ -10,7 +10,6 @@ const util = require('util');
 const IntegrationTest = require('../integration-test');
 const WDCReader = require('../../db/WDCReader');
 const FieldType = require('../../db/FieldType');
-const listfile = require('../../loader/listfile');
 const generics = require('../../generics');
 const log = require('../../log');
 
@@ -81,7 +80,7 @@ class DB2Test extends IntegrationTest {
 		}
 
 		// For every DB2 file in the listfile, generate a test function.
-		const tables = listfile.getFilenamesByExtension('.db2');
+		const tables = this.casc.listfile.getFilenamesByExtension('.db2');
 		for (let table of tables) {
 			table = table.split(" [")[0];
 			const tableName = 'testTable_' + path.basename(table);

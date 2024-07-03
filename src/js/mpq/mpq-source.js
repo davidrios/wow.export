@@ -8,7 +8,7 @@ const fsp = fs.promises;
 const path = require('path');
 const cp = require('child_process');
 const util = require('util');
-const listfile = require('../loader/listfile');
+const { Listfile, normalizeFilename } = require('../loader/listfile');
 const constants = require('../constants');
 const log = require('../log');
 const core = require('../core');
@@ -66,6 +66,7 @@ class MPQ {
 		this.dir = dir;
 		this.dataDir = path.join(dir, constants.BUILD.DATA_DIR);
 		this.remoteCASC = null;
+		this.listfile = new Listfile();
 	}
 
 	async isValid() {
@@ -170,8 +171,8 @@ class MPQ {
 			this.fileByID.set(id, info);
 		}
 
-		listfile.setTables(idMap, nameMap);
-		await listfile.setupFilterListfile();
+		this.listfile.replace(nameMap, idMap, true);
+		await this.listfile.setupFilterListfile();
 
 		await this.loadTables();
 
@@ -186,7 +187,7 @@ class MPQ {
 
 		for (const filePath of (await mpq.getFileList())) {
 			this.fileListMap.set(
-				listfile.normalizeFilename(filePath),
+				normalizeFilename(filePath),
 				{ filePath, mpq }
 			);
 		}
@@ -218,7 +219,7 @@ class MPQ {
 			if (map[name] == null)
 				map[name] = ++resourceID;
 
-			const FileDataID = listfile.getByFilename(filePath);
+			const FileDataID = this.listfile.getByFilename(filePath);
 
 			if (ext === '.blp') {
 				textureFileData.set(
@@ -250,14 +251,14 @@ class MPQ {
 			const creatureModelData = new WDCReader('DBFilesClient/CreatureModelData.dbc');
 			await creatureModelData.parse();
 			for (const modelRow of creatureModelData.getAllRows().values())
-				modelRow.FileDataID = listfile.getByFilename(modelRow.ModelName);
+				modelRow.FileDataID = this.listfile.getByFilename(modelRow.ModelName);
 
 			for (const displayRow of creatureDisplayInfo.getAllRows().values()) {
 				const model = creatureModelData.getRow(displayRow.ModelID);
 				displayRow.TextureVariationFileDataID =
 					displayRow.TextureVariation
 						.filter(t => t !== '')
-						.map((t) => listfile.getByFilename(`${path.dirname(model.ModelName)}\\${t}.blp`));
+						.map((t) => this.listfile.getByFilename(`${path.dirname(model.ModelName)}\\${t}.blp`));
 			}
 
 			await DBCreatures.initializeCreatureData(creatureDisplayInfo, creatureModelData, new Map());
@@ -315,7 +316,7 @@ class MPQ {
 	}
 
 	get remoteCASCProgressSteps() {
-		return this.remoteCASC == null ? 9 : 0;
+		return this.remoteCASC == null ? 10 : 0;
 	}
 
 	async getRemoteCASC(progress) {
@@ -342,6 +343,7 @@ class MPQ {
 			await cascSource.preload(buildIndex);
 			await cascSource.loadEncoding();
 			await cascSource.loadRoot();
+			await cascSource.loadListfile(cascSource.build.BuildConfig);
 
 			this.remoteCASC = cascSource;
 		} catch (e) {
@@ -361,9 +363,8 @@ class MPQ {
 
 		const cascSource = await this.getRemoteCASC(progress);
 		if (cascSource != null) {
-			const itemSparseFile = await cascSource.getFile(1572924, true, false, true);
-			const itemSparse = new WDCReader('DBFilesClient/ItemSparse.db2');
-			await itemSparse.parse(itemSparseFile.readBuffer());
+			const itemSparse = new WDCReader('DBFilesClient/ItemSparse.db2', cascSource);
+			await itemSparse.parse();
 			itemSparseRows = itemSparse.getAllRows();
 		}
 
@@ -387,7 +388,7 @@ class MPQ {
 			const itemDisplayInfoRow = itemDisplayInfo.getRow(itemRow.DisplayInfoID);
 
 			if (itemDisplayInfoRow !== null) {
-				IconFileDataID = listfile.getByFilename(`interface/icons/${itemDisplayInfoRow.InventoryIcon[0]}.blp`) ?? 0;
+				IconFileDataID = this.listfile.getByFilename(`interface/icons/${itemDisplayInfoRow.InventoryIcon[0]}.blp`) ?? 0;
 				materials = [];
 				models = [];
 
@@ -415,7 +416,7 @@ class MPQ {
 		return items;
 	}
 
-	async loadCharacters(progress) {
+	async getCharactersInformation(progress) {
 		const chrModelIDToFileDataID = new Map();
 		const chrModelIDToTextureLayoutID = new Map();
 		const optionsByChrModel = new Map();

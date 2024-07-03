@@ -5,7 +5,6 @@
  */
 const path = require('path');
 const core = require('../core');
-const listfile = require('../loader/listfile');
 
 let _syncID = 0;
 
@@ -48,7 +47,7 @@ const setSlotFile = (slotIndex, fileDataID, syncID) => {
 	if (slot) {
 		slot.fileDataID = fileDataID;
 
-		const fileName = listfile.getByID(fileDataID) ?? fileDataID.toString();
+		const fileName = core.view.casc.listfile.getByID(fileDataID) ?? fileDataID.toString();
 		slot.fileName = fileName;
 		slot.displayName = path.basename(fileName, path.extname(fileName));
 	}

@@ -11,7 +11,6 @@ const BLPFile = require('../../casc/blp');
 const Texture = require('../Texture');
 const WMOLoader = require('../loaders/WMOLoader');
 const M2Renderer = require('./M2Renderer');
-const listfile = require('../../loader/listfile');
 const textureRibbon = require('../../ui/texture-ribbon');
 
 const DEFAULT_MATERIAL = new THREE.MeshPhongMaterial({ color: 0x57afe2, side: THREE.DoubleSide });
@@ -181,7 +180,7 @@ class WMORenderer {
 			return;
 
 		if (wmo.textureNames)
-			textureID = listfile.getByFilename(textureID) || 0;
+			textureID = core.view.casc.listfile.getByFilename(textureID) || 0;
 
 		if (textureID > 0) {
 			const ribbonSlot = textureRibbon.addSlot();
@@ -223,7 +222,7 @@ class WMORenderer {
 			if (wmo.fileDataIDs)
 				fileDataID = wmo.fileDataIDs[doodad.offset];
 			else
-				fileDataID = listfile.getByFilename(wmo.doodadNames[doodad.offset]) || 0;
+				fileDataID = casc.listfile.getByFilename(wmo.doodadNames[doodad.offset]) || 0;
 
 			if (fileDataID > 0) {
 				try {

@@ -7,7 +7,7 @@ const core = require('../core');
 const log = require('../log');
 const ExportHelper = require('../casc/export-helper');
 const generics = require('../generics');
-const listfile = require('../loader/listfile');
+const { stripFileEntry } = require('../loader/listfile');
 
 let manifest = null;
 
@@ -50,7 +50,7 @@ core.events.on('click-export-install', async () => {
 			return;
 
 			
-		fileName = listfile.stripFileEntry(fileName);
+		fileName = stripFileEntry(fileName);
 		const file = manifest.files.find(e => e.name === fileName);
 		const exportPath = ExportHelper.getExportPath(fileName);
 

@@ -9,7 +9,7 @@ const path = require('path');
 const fsp = require('fs').promises;
 const constants = require('../../constants');
 const generics = require('../../generics');
-const listfile = require('../../loader/listfile');
+const { formatUnknownFile } = require('../../loader/listfile');
 const log = require('../../log');
 
 const BufferWrapper = require('../../buffer');
@@ -79,7 +79,7 @@ const loadFoliageTables = async () => {
 			await dbDoodads.parse();
 			for (const entry of dbDoodads.rows.values()) {
 				if (entry.ModelFileID == null && entry.Doodadpath != null)
-					entry.ModelFileID = listfile.getByFilename(`world/nodxt/detail/${entry.Doodadpath}`);
+					entry.ModelFileID = core.view.casc.listfile.getByFilename(`world/nodxt/detail/${entry.Doodadpath}`);
 			}
 
 			dbTextures = new WDCReader('DBFilesClient/GroundEffectTexture.db2');
@@ -272,6 +272,8 @@ class ADTExporter {
 
 		const tilePrefix = prefix + '_' + this.tileID;
 
+		const listfile = core.view.casc.listfile;
+
 		let rootFileDataID;
 		let tex0FileDataID;
 		let obj0FileDataID;
@@ -328,7 +330,7 @@ class ADTExporter {
 		const texAdt = new ADTLoader(texFile, isMPQ);
 		texAdt.loadTex(wdt);
 		if (texAdt.textures != null && texAdt.diffuseTextureFileDataIDs == null) {
-			texAdt.diffuseTextureFileDataIDs = Object.values(texAdt.textures).map(listfile.getByFilename);
+			texAdt.diffuseTextureFileDataIDs = Object.values(texAdt.textures).map(filename => listfile.getByFilename(filename));
 			texAdt.heightTextureFileDataIDs = [];
 		}
 
@@ -518,7 +520,7 @@ class ADTExporter {
 						if (fileName !== undefined)
 							fileName = ExportHelper.replaceExtension(fileName, '.png');
 						else
-							fileName = listfile.formatUnknownFile(fileDataID, '.png');
+							fileName = formatUnknownFile(fileDataID, '.png');
 					
 						let texFile;
 						let texPath;
@@ -979,7 +981,7 @@ class ADTExporter {
 				if (fileName !== undefined)
 					fileName = ExportHelper.replaceExtension(fileName, '.blp');
 				else
-					fileName = listfile.formatUnknownFile(fileDataID, '.blp');
+					fileName = formatUnknownFile(fileDataID, '.blp');
 			
 				let texFile;
 				let texPath;
@@ -1035,7 +1037,7 @@ class ADTExporter {
 								fileName = ExportHelper.replaceExtension(fileName, '.obj');
 							} else {
 								// Handle unknown file.
-								fileName = listfile.formatUnknownFile(fileDataID, '.obj');
+								fileName = formatUnknownFile(fileDataID, '.obj');
 							}
 						}
 
@@ -1127,7 +1129,7 @@ class ADTExporter {
 									fileName = ExportHelper.replaceExtension(fileName, '_set' + model.doodadSet + '.obj');
 								} else {
 									// Handle unknown WMO files.
-									fileName = listfile.formatUnknownFile(fileDataID, '_set' + model.doodadSet + '.obj');
+									fileName = formatUnknownFile(fileDataID, '_set' + model.doodadSet + '.obj');
 								}
 							}
 

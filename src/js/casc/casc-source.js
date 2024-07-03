@@ -3,13 +3,17 @@
 	Authors: Kruithne <kruithne@gmail.com>, Marlamin <marlamin@marlamin.com>
 	License: MIT
  */
+const util = require('util');
 const BLTEReader = require('./blte-reader').BLTEReader;
-const listfile = require('../loader/listfile');
+const { Listfile } = require('../loader/listfile');
 const log = require('../log');
 const core = require('../core');
 const LocaleFlag = require('./locale-flags').flags;
 const ContentFlag = require('./content-flags');
 const InstallManifest = require('./install-manifest');
+const constants = require('../constants');
+const generics = require('../generics');
+const BufferWrapper = require('../buffer');
 
 const WDCReader = require('../db/WDCReader');
 const DBModelFileData = require('../db/caches/DBModelFileData');
@@ -27,6 +31,7 @@ class CASC {
 		this.rootTypes = [];
 		this.rootEntries = new Map();
 		this.isRemote = isRemote;
+		this.listfile = new Listfile();
 
 		// Listen for configuration changes to cascLocale.
 		this.unhookConfig = core.view.$watch('config.cascLocale', (locale) => {
@@ -140,7 +145,7 @@ class CASC {
 		if (fileName.startsWith("unknown/") && !fileName.includes('.'))
 			fileDataID = parseInt(fileName.split('/')[1]);
 		else 
-			fileDataID = listfile.getByFilename(fileName);
+			fileDataID = this.listfile.getByFilename(fileName);
 
 		if (fileDataID === undefined)
 			throw new Error('File not mapping in listfile: ' + fileName);
@@ -154,9 +159,112 @@ class CASC {
 	 */
 	async loadListfile(buildKey) {
 		await this.progress.step('Loading listfile');
-		const entries = await listfile.loadListFile(buildKey, this.cache, this.rootEntries);
-		if (entries === 0)
+
+		log.write('Loading listfile for build %s', buildKey);
+
+		let url = String(core.view.config.listfileURL);
+		if (typeof url !== 'string')
+			throw new Error('Missing/malformed listfileURL in configuration!');
+
+		// Replace optional buildID wildcard.
+		if (url.includes('%s'))
+			url = util.format(url, buildKey);
+
+		const idLookup = new Map();
+		const nameLookup = new Map();
+
+		let data;
+		if (url.startsWith('http')) {
+			// Listfile URL is http, check for cache/updates.
+			let requireDownload = false;
+			const cached = await this.cache.getFile(constants.CACHE.BUILD_LISTFILE);
+
+			if (this.cache.meta.lastListfileUpdate) {
+				let ttl = Number(core.view.config.listfileCacheRefresh) || 0;
+				ttl *= 24 * 60 * 60 * 1000; // Reduce from days to milliseconds.
+
+				if (ttl === 0 || (Date.now() - this.cache.meta.lastListfileUpdate) > ttl) {
+					// Local cache file needs updating (or has invalid manifest entry).
+					log.write('Cached listfile for %s is out-of-date (> %d).', buildKey, ttl);
+					requireDownload = true;
+				} else {
+					// Ensure that the local cache file *actually* exists before relying on it.
+					if (cached === null) {
+						log.write('Listfile for %s is missing despite meta entry. User tamper?', buildKey);
+						requireDownload = true;
+					} else {
+						log.write('Listfile for %s is cached locally.', buildKey);
+					}
+				}
+			} else {
+				// This listfile has never been updated.
+				requireDownload = true;
+				log.write('Listfile for %s is not cached, downloading fresh.', buildKey);
+			}
+
+			if (requireDownload) {
+				try {
+					const fallback_url = String(core.view.config.listfileFallbackURL);
+					data = await generics.downloadFile([url, fallback_url]);
+
+					this.cache.storeFile(constants.CACHE.BUILD_LISTFILE, data);
+
+					this.cache.meta.lastListfileUpdate = Date.now();
+					this.cache.saveManifest();
+				} catch (e) {
+					if (cached === null)
+						throw new Error('Failed to download listfile, no cached version for fallback');
+
+					data = cached;
+				}
+			} else {
+				data = cached;
+			}
+		} else {
+			// User has configured a local listfile location.
+			log.write('Loading user-defined local listfile: %s', url);
+			data = await BufferWrapper.readFile(url);
+		}
+
+		// Parse all lines in the listfile.
+		// Example: 53187;sound/music/citymusic/darnassus/druid grove.mp3
+		const lines = data.readLines();
+		for (const line of lines) {
+			if (line.length === 0)
+				continue;
+
+			const tokens = line.split(';');
+
+			if (tokens.length !== 2) {
+				log.write('Invalid listfile line (token count): %s', line);
+				return;
+			}
+
+			const fileDataID = Number(tokens[0]);
+			if (isNaN(fileDataID)) {
+				log.write('Invalid listfile line (non-numerical ID): %s', line);
+				return;
+			}
+
+			if (this.rootEntries.has(fileDataID))
+			{
+				const fileName = tokens[1].toLowerCase();
+				idLookup.set(fileDataID, fileName);
+				nameLookup.set(fileName, fileDataID);
+			}
+		}
+
+		if (idLookup.size === 0) {
+			log.write('Invalid listfile count (no entries)');
+			return;
+		}
+
+		log.write('%d listfile entries loaded', idLookup.size);
+
+		if (idLookup.size === 0)
 			throw new Error('No listfile entries found');
+
+		this.listfile.replace(nameLookup, idLookup, true);
 	}
 
 	/**
@@ -177,7 +285,7 @@ class CASC {
 		// unknown entries to the listfile.
 		if (core.view.config.enableUnknownFiles) {
 			this.progress.step('Checking data tables for unknown files');
-			await listfile.loadUnknowns();
+			await this.listfile.loadUnknowns();
 		} else {
 			await this.progress.step();
 		}
@@ -380,6 +488,210 @@ class CASC {
 	 */
 	cleanup() {
 		this.unhookConfig();
+	}
+
+	async getCharactersInformation (progress) {
+		const chrModelIDToFileDataID = new Map();
+		const chrModelIDToTextureLayoutID = new Map();
+		const optionsByChrModel = new Map();
+		const optionToChoices = new Map();
+		const defaultOptions = new Array();
+
+		const chrRaceMap = new Map();
+		const chrRaceXChrModelMap = new Map();
+
+		const choiceToGeoset = new Map();
+		const choiceToChrCustMaterialID = new Map();
+		const choiceToSkinnedModel = new Map();
+		const unsupportedChoices = new Array();
+
+		const geosetMap = new Map();
+		const chrCustMatMap = new Map();
+		const chrModelTextureLayerMap = new Map();
+		const charComponentTextureSectionMap = new Map();
+		const chrModelMaterialMap = new Map();
+		const chrCustSkinnedModelMap = new Map();
+
+		await progress.step('Loading character models..');
+		const chrModelDB = new WDCReader('DBFilesClient/ChrModel.db2', this);
+		await chrModelDB.parse();
+
+		await progress.step('Loading character customization choices...');
+		const chrCustChoiceDB = new WDCReader('DBFilesClient/ChrCustomizationChoice.db2', this);
+		await chrCustChoiceDB.parse();
+
+		// TODO: There is so many DB2 loading below relying on fields existing, we should probably check for them first and handle missing ones gracefully.
+		await progress.step('Loading character customization materials...');
+		const chrCustMatDB = new WDCReader('DBFilesClient/ChrCustomizationMaterial.db2', this);
+		await chrCustMatDB.parse();
+
+		await progress.step('Loading character customization elements...');
+		const chrCustElementDB = new WDCReader('DBFilesClient/ChrCustomizationElement.db2', this);
+		await chrCustElementDB.parse();
+
+		for (const chrCustomizationElementRow of chrCustElementDB.getAllRows().values()) {
+			if (chrCustomizationElementRow.ChrCustomizationGeosetID != 0)
+				choiceToGeoset.set(chrCustomizationElementRow.ChrCustomizationChoiceID, chrCustomizationElementRow.ChrCustomizationGeosetID);
+
+			if (chrCustomizationElementRow.ChrCustomizationSkinnedModelID != 0) {
+				choiceToSkinnedModel.set(chrCustomizationElementRow.ChrCustomizationChoiceID, chrCustomizationElementRow.ChrCustomizationSkinnedModelID);
+				unsupportedChoices.push(chrCustomizationElementRow.ChrCustomizationChoiceID);
+			}
+
+			if (chrCustomizationElementRow.ChrCustomizationBoneSetID != 0)
+				unsupportedChoices.push(chrCustomizationElementRow.ChrCustomizationChoiceID);
+
+			if (chrCustomizationElementRow.ChrCustomizationCondModelID != 0)
+				unsupportedChoices.push(chrCustomizationElementRow.ChrCustomizationChoiceID);
+
+			if (chrCustomizationElementRow.ChrCustomizationDisplayInfoID != 0)
+				unsupportedChoices.push(chrCustomizationElementRow.ChrCustomizationChoiceID);
+
+			if (chrCustomizationElementRow.ChrCustomizationMaterialID != 0) {
+				if (choiceToChrCustMaterialID.has(chrCustomizationElementRow.ChrCustomizationChoiceID))
+					choiceToChrCustMaterialID.get(chrCustomizationElementRow.ChrCustomizationChoiceID).push({ ChrCustomizationMaterialID: chrCustomizationElementRow.ChrCustomizationMaterialID, RelatedChrCustomizationChoiceID: chrCustomizationElementRow.RelatedChrCustomizationChoiceID });
+				else
+					choiceToChrCustMaterialID.set(chrCustomizationElementRow.ChrCustomizationChoiceID, [{ ChrCustomizationMaterialID: chrCustomizationElementRow.ChrCustomizationMaterialID, RelatedChrCustomizationChoiceID: chrCustomizationElementRow.RelatedChrCustomizationChoiceID }]);
+
+				const matRow = chrCustMatDB.getRow(chrCustomizationElementRow.ChrCustomizationMaterialID);
+				let FileDataID = DBTextureFileData.getTextureFDIDsByMatID(matRow.MaterialResourcesID);
+				if (FileDataID?.length > 0)
+					FileDataID = FileDataID[0];
+				chrCustMatMap.set(matRow.ID, { ChrModelTextureTargetID: matRow.ChrModelTextureTargetID, FileDataID });
+			}
+		}
+
+		await progress.step('Loading character customization options...');
+		const chrCustOptDB = new WDCReader('DBFilesClient/ChrCustomizationOption.db2', this);
+		await chrCustOptDB.parse();
+
+		for (const [chrModelID, chrModelRow] of chrModelDB.getAllRows()) {
+			const fileDataID = DBCreatures.getFileDataIDByDisplayID(chrModelRow.DisplayID);
+
+			chrModelIDToFileDataID.set(chrModelID, fileDataID);
+			chrModelIDToTextureLayoutID.set(chrModelID, chrModelRow.CharComponentTextureLayoutID);
+
+			for (const [chrCustomizationOptionID, chrCustomizationOptionRow] of chrCustOptDB.getAllRows()) {
+				if (chrCustomizationOptionRow.ChrModelID != chrModelID)
+					continue;
+
+				const choiceList = [];
+
+				if (!optionsByChrModel.has(chrCustomizationOptionRow.ChrModelID))
+					optionsByChrModel.set(chrCustomizationOptionRow.ChrModelID, []);
+
+				let optionName = '';
+				if (chrCustomizationOptionRow.Name_lang != '')
+					optionName = chrCustomizationOptionRow.Name_lang;
+				else
+					optionName = 'Option ' + chrCustomizationOptionRow.OrderIndex;
+
+				optionsByChrModel.get(chrCustomizationOptionRow.ChrModelID).push({ id: chrCustomizationOptionID, label: optionName });
+
+				for (const [chrCustomizationChoiceID, chrCustomizationChoiceRow] of chrCustChoiceDB.getAllRows()) {
+					if (chrCustomizationChoiceRow.ChrCustomizationOptionID != chrCustomizationOptionID)
+						continue;
+
+					// Generate name because Blizz hasn't gotten around to setting it for everything yet.
+					let name = '';
+					if (chrCustomizationChoiceRow.Name_lang != '')
+						name = chrCustomizationChoiceRow.Name_lang;
+					else
+						name = 'Choice ' + chrCustomizationChoiceRow.OrderIndex;
+
+					if (unsupportedChoices.includes(chrCustomizationChoiceID))
+						name += '*';
+
+					choiceList.push({ id: chrCustomizationChoiceID, label: name });
+				}
+
+				optionToChoices.set(chrCustomizationOptionID, choiceList);
+
+				// If option flags does not have 0x20 ("EXCLUDE_FROM_INITIAL_RANDOMIZATION") we can assume it's a default option.
+				if (!(chrCustomizationOptionRow.Flags & 0x20))
+					defaultOptions.push(chrCustomizationOptionID);
+			}
+		}
+
+		await progress.step('Loading character races..');
+		const chrRacesDB = new WDCReader('DBFilesClient/ChrRaces.db2', this);
+		await chrRacesDB.parse();
+
+		for (const [chrRaceID, chrRaceRow] of chrRacesDB.getAllRows()) {
+			const flags = chrRaceRow.Flags;
+			chrRaceMap.set(chrRaceID, { id: chrRaceID, name: chrRaceRow.Name_lang, isNPCRace: ((flags & 1) == 1 && chrRaceID != 23 && chrRaceID != 75) });
+		}
+
+		await progress.step('Loading character race models..');
+		const chrRaceXChrModelDB = new WDCReader('DBFilesClient/ChrRaceXChrModel.db2', this);
+		await chrRaceXChrModelDB.parse();
+
+		for (const chrRaceXChrModelRow of chrRaceXChrModelDB.getAllRows().values()) {
+			if (!chrRaceXChrModelMap.has(chrRaceXChrModelRow.ChrRacesID))
+				chrRaceXChrModelMap.set(chrRaceXChrModelRow.ChrRacesID, new Map());
+
+			chrRaceXChrModelMap.get(chrRaceXChrModelRow.ChrRacesID).set(chrRaceXChrModelRow.Sex, chrRaceXChrModelRow.ChrModelID);
+		}
+
+		await progress.step('Loading character model materials..');
+		const chrModelMatDB = new WDCReader('DBFilesClient/ChrModelMaterial.db2', this);
+		await chrModelMatDB.parse();
+
+		for (const chrModelMaterialRow of chrModelMatDB.getAllRows().values())
+			chrModelMaterialMap.set(chrModelMaterialRow.CharComponentTextureLayoutsID + "-" + chrModelMaterialRow.TextureType, chrModelMaterialRow);
+
+		// load charComponentTextureSection
+		await progress.step('Loading character component texture sections...');
+		const charComponentTextureSectionDB = new WDCReader('DBFilesClient/CharComponentTextureSections.db2', this);
+		await charComponentTextureSectionDB.parse();
+		for (const charComponentTextureSectionRow of charComponentTextureSectionDB.getAllRows().values()) {
+			if (!charComponentTextureSectionMap.has(charComponentTextureSectionRow.CharComponentTextureLayoutID))
+				charComponentTextureSectionMap.set(charComponentTextureSectionRow.CharComponentTextureLayoutID, []);
+
+			charComponentTextureSectionMap.get(charComponentTextureSectionRow.CharComponentTextureLayoutID).push(charComponentTextureSectionRow);
+		}
+
+		await progress.step('Loading character model texture layers...');
+		const chrModelTextureLayerDB = new WDCReader('DBFilesClient/ChrModelTextureLayer.db2', this);
+		await chrModelTextureLayerDB.parse();
+		for (const chrModelTextureLayerRow of chrModelTextureLayerDB.getAllRows().values())
+			chrModelTextureLayerMap.set(chrModelTextureLayerRow.CharComponentTextureLayoutsID + "-" + chrModelTextureLayerRow.ChrModelTextureTargetID[0], chrModelTextureLayerRow);
+
+		await progress.step('Loading character customization geosets...');
+		const chrCustGeosetDB = new WDCReader('DBFilesClient/ChrCustomizationGeoset.db2', this);
+		await chrCustGeosetDB.parse();
+
+		for (const [chrCustomizationGeosetID, chrCustomizationGeosetRow] of chrCustGeosetDB.getAllRows()) {
+			const geoset = chrCustomizationGeosetRow.GeosetType.toString().padStart(2, '0') + chrCustomizationGeosetRow.GeosetID.toString().padStart(2, '0');
+			geosetMap.set(chrCustomizationGeosetID, Number(geoset));
+		}
+
+		await progress.step('Loading character customization skinned models...');
+
+		const chrCustSkinnedModelDB = new WDCReader('DBFilesClient/ChrCustomizationSkinnedModel.db2', this);
+		await chrCustSkinnedModelDB.parse();
+		for (const [chrCustomizationSkinnedModelID, chrCustomizationSkinnedModelRow] of chrCustSkinnedModelDB.getAllRows())
+			chrCustSkinnedModelMap.set(chrCustomizationSkinnedModelID, chrCustomizationSkinnedModelRow);
+
+		return {
+			chrModelIDToFileDataID,
+			chrModelIDToTextureLayoutID,
+			optionsByChrModel,
+			optionToChoices,
+			defaultOptions,
+			chrRaceMap,
+			chrRaceXChrModelMap,
+			choiceToGeoset,
+			choiceToChrCustMaterialID,
+			choiceToSkinnedModel,
+			unsupportedChoices,
+			geosetMap,
+			chrCustMatMap,
+			chrModelTextureLayerMap,
+			charComponentTextureSectionMap,
+			chrModelMaterialMap,
+			chrCustSkinnedModelMap,
+		}
 	}
 }
 

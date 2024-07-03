@@ -3,315 +3,239 @@
 	Authors: Kruithne <kruithne@gmail.com>
 	License: MIT
  */
-const util = require('util');
-const generics = require('../generics');
 const constants = require('../constants');
 const core = require('../core');
 const log = require('../log');
-const BufferWrapper = require('../buffer');
 const ExportHelper = require('../casc/export-helper');
 
 const WDCReader = require('../db/WDCReader');
 const DBTextureFileData = require('../db/caches/DBTextureFileData');
 const DBModelFileData = require('../db/caches/DBModelFileData');
 
-let nameLookup = new Map();
-let idLookup = new Map();
+class Listfile {
+	constructor(nameLookup, idLookup, loaded) {
+		this.replace(nameLookup, idLookup, loaded);
+	}
 
-let loaded = false;
+	replace(nameLookup, idLookup, loaded) {
+		this.nameLookup = nameLookup ?? new Map();
+		this.idLookup = idLookup ?? new Map();
+		this.loaded = !!loaded;
+	}
 
-const setTables = (id, name) => {
-	idLookup = id;
-	nameLookup = name;
-	loaded = true;
-	log.write('%d listfile entries loaded', idLookup.size);
-}
+	/**
+		* Load unknown files from TextureFileData/ModelFileData.
+		* Must be called after DBTextureFileData/DBModelFileData have loaded.
+		*/
+	async loadUnknowns () {
+		const unkBlp = await this.loadIDTable(DBTextureFileData.getFileDataIDs(), '.blp');
+		const unkM2 = await this.loadIDTable(DBModelFileData.getFileDataIDs(), '.m2');
 
-/**
-	* Load CASC listfile for the given build configuration key.
-	* Returns the amount of file ID to filename mappings loaded.
-	* @param {string} buildConfig
-	* @param {BuildCache} cache
-	* @param {Map} rootEntries
-	*/
-const loadListFile = async (buildConfig, cache, rootEntries) => {
-	log.write('Loading listfile for build %s', buildConfig);
+		log.write('Added %d unknown BLP textures from TextureFileData to listfile', unkBlp);
+		log.write('Added %d unknown M2 models from ModelFileData to listfile', unkM2);
 
-	let url = String(core.view.config.listfileURL);
-	if (typeof url !== 'string')
-		throw new Error('Missing/malformed listfileURL in configuration!');
+		// Load unknown sounds from SoundKitEntry table.
+		const soundKitEntries = new WDCReader('DBFilesClient/SoundKitEntry.db2');
+		await soundKitEntries.parse();
 
-	// Replace optional buildID wildcard.
-	if (url.includes('%s'))
-		url = util.format(url, buildConfig);
+		let unknownCount = 0;
+		for (const entry of soundKitEntries.getAllRows().values()) {
+			if (!this.idLookup.has(entry.FileDataID)) {
+				// List unknown sound files using the .unk_sound extension. Files will be
+				// dynamically checked upon export and given the correct extension.
+				const fileName = 'unknown/' + entry.FileDataID + '.unk_sound';
+				this.idLookup.set(entry.FileDataID, fileName);
+				this.nameLookup.set(fileName, entry.FileDataID);
+				unknownCount++;
+			}
+		}
 
-	idLookup.clear();
-	nameLookup.clear();
+		log.write('Added %d unknown sound files from SoundKitEntry to listfile', unknownCount);
+	}
 
-	let data;
-	if (url.startsWith('http')) {
-		// Listfile URL is http, check for cache/updates.
-		let requireDownload = false;
-		const cached = await cache.getFile(constants.CACHE.BUILD_LISTFILE);
+	/**
+		* Load file IDs from a data table.
+		* @param {Set} ids
+		* @param {string} ext 
+		*/
+	async loadIDTable(ids, ext) {
+		let loadCount = 0;
 
-		if (cache.meta.lastListfileUpdate) {
-			let ttl = Number(core.view.config.listfileCacheRefresh) || 0;
-			ttl *= 24 * 60 * 60 * 1000; // Reduce from days to milliseconds.
+		for (const fileDataID of ids) {
+			if (!this.idLookup.has(fileDataID)) {
+				const fileName = 'unknown/' + fileDataID + ext;
+				this.idLookup.set(fileDataID, fileName);
+				this.nameLookup.set(fileName, fileDataID);
+				loadCount++;
+			}
+		}
 
-			if (ttl === 0 || (Date.now() - cache.meta.lastListfileUpdate) > ttl) {
-				// Local cache file needs updating (or has invalid manifest entry).
-				log.write('Cached listfile for %s is out-of-date (> %d).', buildConfig, ttl);
-				requireDownload = true;
-			} else {
-				// Ensure that the local cache file *actually* exists before relying on it.
-				if (cached === null) {
-					log.write('Listfile for %s is missing despite meta entry. User tamper?', buildConfig);
-					requireDownload = true;
+		return loadCount;
+	}
+
+	/**
+		* Return an array of filenames ending with the given extension(s).
+		* @param {string|Array} exts 
+		* @returns {Array}
+		*/
+	getFilenamesByExtension(exts) {
+		// Box into an array for reduced code.
+		if (!Array.isArray(exts))
+			exts = [exts];
+
+		let entries = [];
+
+		for (const [fileDataID, filename] of this.idLookup.entries()) {
+			for (const ext of exts) {
+				if (Array.isArray(ext)) {
+					if (filename.endsWith(ext[0]) && !filename.match(ext[1])) {
+						entries.push(fileDataID);
+						continue;
+					}
 				} else {
-					log.write('Listfile for %s is cached locally.', buildConfig);
+					if (filename.endsWith(ext)) {
+						entries.push(fileDataID);
+						continue;
+					}
 				}
 			}
-		} else {
-			// This listfile has never been updated.
-			requireDownload = true;
-			log.write('Listfile for %s is not cached, downloading fresh.', buildConfig);
 		}
 
-		if (requireDownload) {
-			try {
-				const fallback_url = String(core.view.config.listfileFallbackURL);
-				data = await generics.downloadFile([url, fallback_url]);
-
-				cache.storeFile(constants.CACHE.BUILD_LISTFILE, data);
-
-				cache.meta.lastListfileUpdate = Date.now();
-				cache.saveManifest();
-			} catch (e) {
-				if (cached === null)
-					throw new Error('Failed to download listfile, no cached version for fallback');
-
-				data = cached;
-			}
-		} else {
-			data = cached;
-		}
-	} else {
-		// User has configured a local listfile location.
-		log.write('Loading user-defined local listfile: %s', url);
-		data = await BufferWrapper.readFile(url);
+		return this.formatEntries(entries);
 	}
 
-	// Parse all lines in the listfile.
-	// Example: 53187;sound/music/citymusic/darnassus/druid grove.mp3
-	const lines = data.readLines();
-	for (const line of lines) {
-		if (line.length === 0)
-			continue;
+	/**
+		* Sort and format listfile entries for file list display.
+		* @param {Array} entries 
+		* @returns {Array}
+		*/
+	formatEntries(entries) {
+		// If sorting by ID, perform the sort while the array is only IDs.
+		if (core.view.config.listfileSortByID)
+			entries.sort((a, b) => a - b);
 
-		const tokens = line.split(';');
+		if (core.view.config.listfileShowFileDataIDs)
+			entries = entries.map(e => this.getByIDOrUnknown(e) + ' [' + e + ']');
+		else
+			entries = entries.map(e => this.getByIDOrUnknown(e));
 
-		if (tokens.length !== 2) {
-			log.write('Invalid listfile line (token count): %s', line);
-			return;
-		}
+		// If sorting by name, sort now that the filenames have been added.
+		if (!core.view.config.listfileSortByID)
+			entries.sort();
 
-		const fileDataID = Number(tokens[0]);
-		if (isNaN(fileDataID)) {
-			log.write('Invalid listfile line (non-numerical ID): %s', line);
-			return;
-		}
-
-		if (rootEntries.has(fileDataID))
-		{
-			const fileName = tokens[1].toLowerCase();
-			idLookup.set(fileDataID, fileName);
-			nameLookup.set(fileName, fileDataID);
-		}
+		return entries;
 	}
 
-	if (idLookup.size === 0) {
-		log.write('Invalid listfile count (no entries)');
-		return;
-	}
-
-	loaded = true;
-	log.write('%d listfile entries loaded', idLookup.size);
-	return idLookup.size;
-}
-
-/**
-	* Load unknown files from TextureFileData/ModelFileData.
-	* Must be called after DBTextureFileData/DBModelFileData have loaded.
-	*/
-const loadUnknowns = async () => {
-	const unkBlp = await loadIDTable(DBTextureFileData.getFileDataIDs(), '.blp');
-	const unkM2 = await loadIDTable(DBModelFileData.getFileDataIDs(), '.m2');
-
-	log.write('Added %d unknown BLP textures from TextureFileData to listfile', unkBlp);
-	log.write('Added %d unknown M2 models from ModelFileData to listfile', unkM2);
-
-	// Load unknown sounds from SoundKitEntry table.
-	const soundKitEntries = new WDCReader('DBFilesClient/SoundKitEntry.db2');
-	await soundKitEntries.parse();
-
-	let unknownCount = 0;
-	for (const entry of soundKitEntries.getAllRows().values()) {
-		if (!idLookup.has(entry.FileDataID)) {
-			// List unknown sound files using the .unk_sound extension. Files will be
-			// dynamically checked upon export and given the correct extension.
-			const fileName = 'unknown/' + entry.FileDataID + '.unk_sound';
-			idLookup.set(entry.FileDataID, fileName);
-			nameLookup.set(fileName, entry.FileDataID);
-			unknownCount++;
-		}
-	}
-
-	log.write('Added %d unknown sound files from SoundKitEntry to listfile', unknownCount);
-};
-
-/**
-	* Load file IDs from a data table.
-	* @param {Set} ids
-	* @param {string} ext 
-	*/
-const loadIDTable = async (ids, ext) => {
-	let loadCount = 0;
-
-	for (const fileDataID of ids) {
-		if (!idLookup.has(fileDataID)) {
+	ingestIdentifiedFiles(entries) {
+		for (const [fileDataID, ext] of entries) {
 			const fileName = 'unknown/' + fileDataID + ext;
-			idLookup.set(fileDataID, fileName);
-			nameLookup.set(fileName, fileDataID);
-			loadCount++;
+			this.idLookup.set(fileDataID, fileName);
+			this.nameLookup.set(fileName, fileDataID);
 		}
+
+		core.events.emit('listfile-needs-updating');
 	}
 
-	return loadCount;
-};
+	/**
+		* Returns a full listfile, sorted and formatted.
+		* @returns {Array}
+		*/
+	getFullListfile() {
+		return this.formatEntries([...this.idLookup.keys()]);
+	}
 
-/**
-	* Return an array of filenames ending with the given extension(s).
-	* @param {string|Array} exts 
-	* @returns {Array}
-	*/
-const getFilenamesByExtension = (exts) => {
-	// Box into an array for reduced code.
-	if (!Array.isArray(exts))
-		exts = [exts];
+	/**
+		* Get a filename from a given file data ID.
+		* @param {number} id 
+		* @returns {string|undefined}
+		*/
+	getByID(id) {
+		return this.idLookup.get(id);
+	}
 
-	let entries = [];
+	/**
+		* Get a filename from a given file data ID or format it as an unknown file.
+		* @param {number} id 
+		* @param {string} [ext]
+		* @returns {string}
+		*/
+	getByIDOrUnknown(id, ext = '') {
+		return this.idLookup.get(id) ?? formatUnknownFile(id, ext);
+	}
 
-	for (const [fileDataID, filename] of idLookup.entries()) {
-		for (const ext of exts) {
-			if (Array.isArray(ext)) {
-				if (filename.endsWith(ext[0]) && !filename.match(ext[1])) {
-					entries.push(fileDataID);
-					continue;
-				}
-			} else {
-				if (filename.endsWith(ext)) {
-					entries.push(fileDataID);
-					continue;
-				}
-			}
+	/**
+		* Get a file data ID by a given file name.
+		* @param {string} filename
+		* @returns {number|undefined} 
+		*/
+	getByFilename(filename) {
+		filename = normalizeFilename(filename);
+		let lookup = this.nameLookup.get(filename);
+
+		// In the rare occasion we have a reference to an MDL/MDX file and it fails
+		// to resolve (as expected), attempt to resolve the M2 of the same name.
+		if (!lookup && (filename.endsWith('.mdl') || filename.endsWith('mdx')))
+			lookup = this.nameLookup.get(ExportHelper.replaceExtension(filename, '.m2').replace(/\\/g, '/'));
+
+		return lookup;
+	}
+
+	/**
+		* Returns an array of listfile entries filtered by the given search term.
+		* @param {string|RegExp} search 
+		* @returns {Array.<object>}
+		*/
+	getFilteredEntries(search) {
+		const results = [];
+		const isRegExp = search instanceof RegExp;
+
+		for (const [fileDataID, fileName] of this.idLookup.entries()) {
+			if (isRegExp ? fileName.match(search) : fileName.includes(search))
+				results.push({ fileDataID, fileName });
 		}
+
+		return results;
 	}
 
-	return formatEntries(entries);
-};
+	/**
+		* Strips a prefixed file ID from a listfile entry.
+		* @param {string} entry 
+		* @returns {string}
+		*/
+	stripFileEntry(entry) {
+		if (typeof entry === 'string' && entry.includes(' ['))
+			return entry.substring(0, entry.lastIndexOf(' ['));
 
-/**
-	* Sort and format listfile entries for file list display.
-	* @param {Array} entries 
-	* @returns {Array}
-	*/
-const formatEntries = (entries) => {
-	// If sorting by ID, perform the sort while the array is only IDs.
-	if (core.view.config.listfileSortByID)
-		entries.sort((a, b) => a - b);
-
-	if (core.view.config.listfileShowFileDataIDs)
-		entries = entries.map(e => getByIDOrUnknown(e) + ' [' + e + ']');
-	else
-		entries = entries.map(e => getByIDOrUnknown(e));
-
-	// If sorting by name, sort now that the filenames have been added.
-	if (!core.view.config.listfileSortByID)
-		entries.sort();
-
-	return entries;
-};
-
-const ingestIdentifiedFiles = (entries) => {
-	for (const [fileDataID, ext] of entries) {
-		const fileName = 'unknown/' + fileDataID + ext;
-		idLookup.set(fileDataID, fileName);
-		nameLookup.set(fileName, fileDataID);
+		return entry;
 	}
 
-	core.events.emit('listfile-needs-updating');
-};
-
-/**
-	* Returns a full listfile, sorted and formatted.
-	* @returns {Array}
-	*/
-const getFullListfile = () => {
-	return formatEntries([...idLookup.keys()]);
-};
-
-/**
-	* Get a filename from a given file data ID.
-	* @param {number} id 
-	* @returns {string|undefined}
-	*/
-const getByID = (id) => {
-	return idLookup.get(id);
-};
-
-/**
-	* Get a filename from a given file data ID or format it as an unknown file.
-	* @param {number} id 
-	* @param {string} [ext]
-	* @returns {string}
-	*/
-const getByIDOrUnknown = (id, ext = '') => {
-	return idLookup.get(id) ?? formatUnknownFile(id, ext);
-};
-
-/**
-	* Get a file data ID by a given file name.
-	* @param {string} filename
-	* @returns {number|undefined} 
-	*/
-const getByFilename = (filename) => {
-	filename = normalizeFilename(filename);
-	let lookup = nameLookup.get(filename);
-
-	// In the rare occasion we have a reference to an MDL/MDX file and it fails
-	// to resolve (as expected), attempt to resolve the M2 of the same name.
-	if (!lookup && (filename.endsWith('.mdl') || filename.endsWith('mdx')))
-		lookup = nameLookup.get(ExportHelper.replaceExtension(filename, '.m2').replace(/\\/g, '/'));
-
-	return lookup;
-};
-
-/**
-	* Returns an array of listfile entries filtered by the given search term.
-	* @param {string|RegExp} search 
-	* @returns {Array.<object>}
-	*/
-const getFilteredEntries = (search) => {
-	const results = [];
-	const isRegExp = search instanceof RegExp;
-
-	for (const [fileDataID, fileName] of idLookup.entries()) {
-		if (isRegExp ? fileName.match(search) : fileName.includes(search))
-			results.push({ fileDataID, fileName });
+	/**
+		* Returns true if a listfile has been loaded.
+		* @returns {boolean}
+		*/
+	get isLoaded () {
+		return this.loaded;
 	}
 
-	return results;
-};
+	updateListfileFilters() {
+		core.view.listfileTextures = this.getFilenamesByExtension('.blp');
+		core.view.listfileSounds = this.getFilenamesByExtension(['.ogg', '.mp3', '.unk_sound']);
+		core.view.listfileVideos = this.getFilenamesByExtension('.avi');
+		core.view.listfileText = this.getFilenamesByExtension(['.txt', '.lua', '.xml', '.sbt', '.wtf', '.htm', '.toc', '.xsd']);
+		core.view.listfileModels = this.getFilenamesByExtension(getModelFormats());
+		core.view.listfileDB2s = this.getFilenamesByExtension('.db2');
+	}
+
+	/**
+		* Creates filtered versions of the master listfile.
+		*/
+	async setupFilterListfile() {
+		core.events.on('listfile-needs-updating', () => this.updateListfileFilters());
+
+		core.view.$watch('config.listfileSortByID', () => core.events.emit('listfile-needs-updating'));
+		core.view.$watch('config.listfileShowFileDataIDs', () => core.events.emit('listfile-needs-updating'), { immediate: true });
+	}
+}
 
 /**
 	* Strips a prefixed file ID from a listfile entry.
@@ -335,14 +259,6 @@ const formatUnknownFile = (fileDataID, ext = '') => {
 };
 
 /**
-	* Returns true if a listfile has been loaded.
-	* @returns {boolean}
-	*/
-const isLoaded = () => {
-	return loaded;
-};
-
-/**
 	* Returns an array of model formats to display.
 	* @returns {Array}
 	*/
@@ -358,43 +274,11 @@ const getModelFormats = () => {
 	return modelExt;
 }
 
-const updateListfileFilters = () => {
-	core.view.listfileTextures = getFilenamesByExtension('.blp');
-	core.view.listfileSounds = getFilenamesByExtension(['.ogg', '.mp3', '.unk_sound']);
-	core.view.listfileVideos = getFilenamesByExtension('.avi');
-	core.view.listfileText = getFilenamesByExtension(['.txt', '.lua', '.xml', '.sbt', '.wtf', '.htm', '.toc', '.xsd']);
-	core.view.listfileModels = getFilenamesByExtension(getModelFormats());
-	core.view.listfileDB2s = getFilenamesByExtension('.db2');
-}
-
-/**
-	* Creates filtered versions of the master listfile.
-	*/
-const setupFilterListfile = async () => {
-	core.events.on('listfile-needs-updating', () => updateListfileFilters());
-
-	core.view.$watch('config.listfileSortByID', () => core.events.emit('listfile-needs-updating'));
-	core.view.$watch('config.listfileShowFileDataIDs', () => core.events.emit('listfile-needs-updating'), { immediate: true });
-}
-
 const normalizeFilename = (filename) => filename.toLowerCase().replace(/\\/g, '/');
 
 module.exports = {
-	setTables,
-	loadListFile,
-	loadUnknowns,
-	getByID,
-	getByFilename,
-	getFullListfile,
-	getFilenamesByExtension,
-	getFilteredEntries,
-	getByIDOrUnknown,
+	Listfile,
 	stripFileEntry,
-	formatEntries,
 	formatUnknownFile,
-	ingestIdentifiedFiles,
-	isLoaded,
-	updateListfileFilters,
-	setupFilterListfile,
 	normalizeFilename
 };

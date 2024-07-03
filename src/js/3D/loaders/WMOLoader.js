@@ -4,7 +4,6 @@
 	License: MIT
  */
 const core = require('../../core');
-const listfile = require('../../loader/listfile');
 
 const LoaderGenerics = require('./LoaderGenerics');
 
@@ -22,11 +21,11 @@ class WMOLoader {
 
 		if (fileID !== undefined) {
 			if (typeof fileID === 'string') {
-				this.fileDataID = listfile.getByFilename(fileID);
+				this.fileDataID = core.view.casc.listfile.getByFilename(fileID);
 				this.fileName = fileID;
 			} else {
 				this.fileDataID = fileID;
-				this.fileName = listfile.getByID(fileID);
+				this.fileName = core.view.casc.listfile.getByID(fileID);
 			}
 		}
 	}

@@ -4,7 +4,6 @@
 	License: MIT
  */
 const core = require('../core');
-const listfile = require('../loader/listfile');
 const MultiMap = require('../MultiMap');
 
 const DBModelFileData = require('../db/caches/DBModelFileData');
@@ -94,7 +93,7 @@ const viewItemModels = (item) => {
 	for (const modelID of item.models) {
 		const fileDataIDs = DBModelFileData.getModelFileDataID(modelID);
 		for (const fileDataID of fileDataIDs) {
-			let entry = listfile.getByID(fileDataID);
+			let entry = core.view.casc.listfile.getByID(fileDataID);
 
 			if (entry !== undefined) {
 				if (core.view.config.listfileShowFileDataIDs)
@@ -125,7 +124,7 @@ const viewItemTextures = (item) => {
 	for (const textureID of item.textures) {
 		const fileDataIDs = DBTextureFileData.getTextureFDIDsByMatID(textureID);
 		for (const fileDataID of fileDataIDs) {
-			let entry = listfile.getByID(fileDataID);
+			let entry = core.view.casc.listfile.getByID(fileDataID);
 
 			if (entry !== undefined) {
 				if (core.view.config.listfileShowFileDataIDs)

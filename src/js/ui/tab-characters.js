@@ -10,13 +10,9 @@ const generics = require('../generics');
 const CharMaterialRenderer = require('../3D/renderers/CharMaterialRenderer');
 const M2Renderer = require('../3D/renderers/M2Renderer');
 const M2Exporter = require('../3D/exporters/M2Exporter');
-const WDCReader = require('../db/WDCReader');
 const ExportHelper = require('../casc/export-helper');
 const FileWriter = require('../file-writer');
-const listfile = require('../loader/listfile');
 const realmlist = require('../casc/realmlist');
-const DBCreatures = require('../db/caches/DBCreatures');
-const DBTextureFileData = require('../db/caches/DBTextureFileData');
 
 let camera;
 let scene;
@@ -36,12 +32,6 @@ const chrMaterials = new Map();
 
 //let textureShaderMap = new Map();
 let currentCharComponentTextureLayoutID = 0;
-
-// Can we just keep DB2s opened? 
-let chrCustChoiceDB;
-let chrCustOptDB;
-let chrCustElementDB;
-let chrCustGeosetDB;
 
 async function resetMaterials() {
 	for (const chrMaterial of chrMaterials.values()) {
@@ -161,7 +151,7 @@ async function updateActiveCustomization() {
 				// if (textureShaderMap.has(chrModelTextureLayer.TextureType)) {
 				// 	const shadersForTexture = textureShaderMap.get(chrModelTextureLayer.TextureType);
 				// 	const pixelShader = shadersForTexture.PS;
-				// 	console.log("Texture type " + chrModelTextureLayer.TextureType + " " + listfile.getByID(chrCustMat.FileDataID) +" has pixel shader " + pixelShader);
+				// 	console.log("Texture type " + chrModelTextureLayer.TextureType + " " + core.view.casc.listfile.getByID(chrCustMat.FileDataID) +" has pixel shader " + pixelShader);
 
 				// 	// Yeah no this doesn't work and is NOT how all this is supposed to work
 				// 	if (pixelShader.startsWith('Combiners_Opaque') && chrModelTextureLayer.TextureSectionTypeBitMask == -1)
@@ -526,7 +516,7 @@ const exportCharModel = async () => {
 		return;
 	
 	const fileDataID = activeModel;
-	const fileName = listfile.getByID(fileDataID);
+	const fileName = core.view.casc.listfile.getByID(fileDataID);
 
 	const fileManifest = [];
 	
@@ -663,215 +653,14 @@ async function updateCustomizationChoice() {
 	}
 }
 
-async function loadCASCCharacters (progress) {
-	const chrModelIDToFileDataID = new Map();
-	const chrModelIDToTextureLayoutID = new Map();
-	const optionsByChrModel = new Map();
-	const optionToChoices = new Map();
-	const defaultOptions = new Array();
-
-	const chrRaceMap = new Map();
-	const chrRaceXChrModelMap = new Map();
-
-	const choiceToGeoset = new Map();
-	const choiceToChrCustMaterialID = new Map();
-	const choiceToSkinnedModel = new Map();
-	const unsupportedChoices = new Array();
-
-	const geosetMap = new Map();
-	const chrCustMatMap = new Map();
-	const chrModelTextureLayerMap = new Map();
-	const charComponentTextureSectionMap = new Map();
-	const chrModelMaterialMap = new Map();
-	const chrCustSkinnedModelMap = new Map();
-
-	await progress.step('Loading character models..');
-	const chrModelDB = new WDCReader('DBFilesClient/ChrModel.db2');
-	await chrModelDB.parse();
-
-	await progress.step('Loading character customization choices...');
-	chrCustChoiceDB = new WDCReader('DBFilesClient/ChrCustomizationChoice.db2');
-	await chrCustChoiceDB.parse();
-
-	// TODO: There is so many DB2 loading below relying on fields existing, we should probably check for them first and handle missing ones gracefully.
-	await progress.step('Loading character customization materials...');
-	const chrCustMatDB = new WDCReader('DBFilesClient/ChrCustomizationMaterial.db2');
-	await chrCustMatDB.parse();
-
-	await progress.step('Loading character customization elements...');
-	chrCustElementDB = new WDCReader('DBFilesClient/ChrCustomizationElement.db2');
-	await chrCustElementDB.parse();
-
-	for (const chrCustomizationElementRow of chrCustElementDB.getAllRows().values()) {
-		if (chrCustomizationElementRow.ChrCustomizationGeosetID != 0)
-			choiceToGeoset.set(chrCustomizationElementRow.ChrCustomizationChoiceID, chrCustomizationElementRow.ChrCustomizationGeosetID);
-
-		if (chrCustomizationElementRow.ChrCustomizationSkinnedModelID != 0) {
-			choiceToSkinnedModel.set(chrCustomizationElementRow.ChrCustomizationChoiceID, chrCustomizationElementRow.ChrCustomizationSkinnedModelID);
-			unsupportedChoices.push(chrCustomizationElementRow.ChrCustomizationChoiceID);
-		}
-
-		if (chrCustomizationElementRow.ChrCustomizationBoneSetID != 0)
-			unsupportedChoices.push(chrCustomizationElementRow.ChrCustomizationChoiceID);
-
-		if (chrCustomizationElementRow.ChrCustomizationCondModelID != 0)
-			unsupportedChoices.push(chrCustomizationElementRow.ChrCustomizationChoiceID);
-
-		if (chrCustomizationElementRow.ChrCustomizationDisplayInfoID != 0)
-			unsupportedChoices.push(chrCustomizationElementRow.ChrCustomizationChoiceID);
-
-		if (chrCustomizationElementRow.ChrCustomizationMaterialID != 0) {
-			if (choiceToChrCustMaterialID.has(chrCustomizationElementRow.ChrCustomizationChoiceID))
-				choiceToChrCustMaterialID.get(chrCustomizationElementRow.ChrCustomizationChoiceID).push({ ChrCustomizationMaterialID: chrCustomizationElementRow.ChrCustomizationMaterialID, RelatedChrCustomizationChoiceID: chrCustomizationElementRow.RelatedChrCustomizationChoiceID });
-			else
-				choiceToChrCustMaterialID.set(chrCustomizationElementRow.ChrCustomizationChoiceID, [{ ChrCustomizationMaterialID: chrCustomizationElementRow.ChrCustomizationMaterialID, RelatedChrCustomizationChoiceID: chrCustomizationElementRow.RelatedChrCustomizationChoiceID }]);
-
-			const matRow = chrCustMatDB.getRow(chrCustomizationElementRow.ChrCustomizationMaterialID);
-			let FileDataID = DBTextureFileData.getTextureFDIDsByMatID(matRow.MaterialResourcesID);
-			if (FileDataID?.length > 0)
-				FileDataID = FileDataID[0];
-			chrCustMatMap.set(matRow.ID, { ChrModelTextureTargetID: matRow.ChrModelTextureTargetID, FileDataID });
-		}
-	}
-
-	await progress.step('Loading character customization options...');
-	chrCustOptDB = new WDCReader('DBFilesClient/ChrCustomizationOption.db2');
-	await chrCustOptDB.parse();
-
-	for (const [chrModelID, chrModelRow] of chrModelDB.getAllRows()) {
-		const fileDataID = DBCreatures.getFileDataIDByDisplayID(chrModelRow.DisplayID);
-
-		chrModelIDToFileDataID.set(chrModelID, fileDataID);
-		chrModelIDToTextureLayoutID.set(chrModelID, chrModelRow.CharComponentTextureLayoutID);
-
-		for (const [chrCustomizationOptionID, chrCustomizationOptionRow] of chrCustOptDB.getAllRows()) {
-			if (chrCustomizationOptionRow.ChrModelID != chrModelID)
-				continue;
-
-			const choiceList = [];
-
-			if (!optionsByChrModel.has(chrCustomizationOptionRow.ChrModelID))
-				optionsByChrModel.set(chrCustomizationOptionRow.ChrModelID, []);
-
-			let optionName = '';
-			if (chrCustomizationOptionRow.Name_lang != '')
-				optionName = chrCustomizationOptionRow.Name_lang;
-			else
-				optionName = 'Option ' + chrCustomizationOptionRow.OrderIndex;
-
-			optionsByChrModel.get(chrCustomizationOptionRow.ChrModelID).push({ id: chrCustomizationOptionID, label: optionName });
-
-			for (const [chrCustomizationChoiceID, chrCustomizationChoiceRow] of chrCustChoiceDB.getAllRows()) {
-				if (chrCustomizationChoiceRow.ChrCustomizationOptionID != chrCustomizationOptionID)
-					continue;
-
-				// Generate name because Blizz hasn't gotten around to setting it for everything yet.
-				let name = '';
-				if (chrCustomizationChoiceRow.Name_lang != '')
-					name = chrCustomizationChoiceRow.Name_lang;
-				else
-					name = 'Choice ' + chrCustomizationChoiceRow.OrderIndex;
-
-				if (unsupportedChoices.includes(chrCustomizationChoiceID))
-					name += '*';
-
-				choiceList.push({ id: chrCustomizationChoiceID, label: name });
-			}
-
-			optionToChoices.set(chrCustomizationOptionID, choiceList);
-
-			// If option flags does not have 0x20 ("EXCLUDE_FROM_INITIAL_RANDOMIZATION") we can assume it's a default option.
-			if (!(chrCustomizationOptionRow.Flags & 0x20))
-				defaultOptions.push(chrCustomizationOptionID);
-		}
-	}
-
-	await progress.step('Loading character races..');
-	const chrRacesDB = new WDCReader('DBFilesClient/ChrRaces.db2');
-	await chrRacesDB.parse();
-
-	for (const [chrRaceID, chrRaceRow] of chrRacesDB.getAllRows()) {
-		const flags = chrRaceRow.Flags;
-		chrRaceMap.set(chrRaceID, { id: chrRaceID, name: chrRaceRow.Name_lang, isNPCRace: ((flags & 1) == 1 && chrRaceID != 23 && chrRaceID != 75) });
-	}
-
-	await progress.step('Loading character race models..');
-	const chrRaceXChrModelDB = new WDCReader('DBFilesClient/ChrRaceXChrModel.db2');
-	await chrRaceXChrModelDB.parse();
-
-	for (const chrRaceXChrModelRow of chrRaceXChrModelDB.getAllRows().values()) {
-		if (!chrRaceXChrModelMap.has(chrRaceXChrModelRow.ChrRacesID))
-			chrRaceXChrModelMap.set(chrRaceXChrModelRow.ChrRacesID, new Map());
-
-		chrRaceXChrModelMap.get(chrRaceXChrModelRow.ChrRacesID).set(chrRaceXChrModelRow.Sex, chrRaceXChrModelRow.ChrModelID);
-	}
-
-	await progress.step('Loading character model materials..');
-	const chrModelMatDB = new WDCReader('DBFilesClient/ChrModelMaterial.db2');
-	await chrModelMatDB.parse();
-
-	for (const chrModelMaterialRow of chrModelMatDB.getAllRows().values())
-		chrModelMaterialMap.set(chrModelMaterialRow.CharComponentTextureLayoutsID + "-" + chrModelMaterialRow.TextureType, chrModelMaterialRow);
-
-	// load charComponentTextureSection
-	await progress.step('Loading character component texture sections...');
-	const charComponentTextureSectionDB = new WDCReader('DBFilesClient/CharComponentTextureSections.db2');
-	await charComponentTextureSectionDB.parse();
-	for (const charComponentTextureSectionRow of charComponentTextureSectionDB.getAllRows().values()) {
-		if (!charComponentTextureSectionMap.has(charComponentTextureSectionRow.CharComponentTextureLayoutID))
-			charComponentTextureSectionMap.set(charComponentTextureSectionRow.CharComponentTextureLayoutID, []);
-
-		charComponentTextureSectionMap.get(charComponentTextureSectionRow.CharComponentTextureLayoutID).push(charComponentTextureSectionRow);
-	}
-
-	await progress.step('Loading character model texture layers...');
-	const chrModelTextureLayerDB = new WDCReader('DBFilesClient/ChrModelTextureLayer.db2');
-	await chrModelTextureLayerDB.parse();
-	for (const chrModelTextureLayerRow of chrModelTextureLayerDB.getAllRows().values())
-		chrModelTextureLayerMap.set(chrModelTextureLayerRow.CharComponentTextureLayoutsID + "-" + chrModelTextureLayerRow.ChrModelTextureTargetID[0], chrModelTextureLayerRow);
-
-	await progress.step('Loading character customization geosets...');
-	chrCustGeosetDB = new WDCReader('DBFilesClient/ChrCustomizationGeoset.db2');
-	await chrCustGeosetDB.parse();
-
-	for (const [chrCustomizationGeosetID, chrCustomizationGeosetRow] of chrCustGeosetDB.getAllRows()) {
-		const geoset = chrCustomizationGeosetRow.GeosetType.toString().padStart(2, '0') + chrCustomizationGeosetRow.GeosetID.toString().padStart(2, '0');
-		geosetMap.set(chrCustomizationGeosetID, Number(geoset));
-	}
-
-	await progress.step('Loading character customization skinned models...');
-
-	const chrCustSkinnedModelDB = new WDCReader('DBFilesClient/ChrCustomizationSkinnedModel.db2');
-	await chrCustSkinnedModelDB.parse();
-	for (const [chrCustomizationSkinnedModelID, chrCustomizationSkinnedModelRow] of chrCustSkinnedModelDB.getAllRows())
-		chrCustSkinnedModelMap.set(chrCustomizationSkinnedModelID, chrCustomizationSkinnedModelRow);
-
-	return {
-		chrModelIDToFileDataID,
-		chrModelIDToTextureLayoutID,
-		optionsByChrModel,
-		optionToChoices,
-		defaultOptions,
-		chrRaceMap,
-		chrRaceXChrModelMap,
-		choiceToGeoset,
-		choiceToChrCustMaterialID,
-		choiceToSkinnedModel,
-		unsupportedChoices,
-		geosetMap,
-		chrCustMatMap,
-		chrModelTextureLayerMap,
-		charComponentTextureSectionMap,
-		chrModelMaterialMap,
-		chrCustSkinnedModelMap,
-	}
-}
-
 core.events.once('screen-tab-characters', async () => {
 	const state = core.view;
 
 	// Initialize a loading screen.
-	const progress = core.createProgress(core.view.dataType === 'mpq' ? 1 : 14);
+	const progress = core.createProgress(14 +
+		(core.view.dataType === 'mpq'
+			? core.view.casc.remoteCASCProgressSteps
+			: 0));
 	state.setScreen('loading');
 	state.isBusy++;
 
@@ -889,10 +678,7 @@ core.events.once('screen-tab-characters', async () => {
 	state.chrImportRegions = Object.keys(state.realmList);
 	state.chrImportSelectedRegion = state.chrImportRegions[0];
 
-	if (core.view.dataType === 'mpq')
-		chrData = await core.view.casc.loadCharacters(progress);
-	else
-		chrData = await loadCASCCharacters(progress);
+	chrData = await core.view.casc.getCharactersInformation(progress);
 
 	await progress.step('Loading character shaders...');
 	await CharMaterialRenderer.init();

@@ -7,7 +7,6 @@ const net = require('net');
 const core = require('../core');
 const log = require('../log');
 const constants = require('../constants');
-const listfile = require('../loader/listfile');
 const RCPConnection = require('./rcp-connection');
 const config = require('../config');
 
@@ -338,14 +337,14 @@ class RCPServer {
 	 * @param {RCPConnection} client 
 	 */
 	handleListfileQueryID(data, client) {
-		if (!listfile.isLoaded())
+		if (!core.view.casc.listfile.isLoaded)
 			return client.sendData('ERR_LISTFILE_NOT_LOADED');
 
 		if (!this.validateParameters(client, data, { fileDataID: 'number' }))
 			return;
 
 		const fileDataID = data.fileDataID;
-		const fileName = listfile.getByID(fileDataID) ?? '';
+		const fileName = core.view.casc.listfile.getByID(fileDataID) ?? '';
 		client.sendData('LISTFILE_RESULT', { fileDataID, fileName });
 	}
 
@@ -355,14 +354,14 @@ class RCPServer {
 	 * @param {RCPConnection} client 
 	 */
 	handleListfileQueryName(data, client) {
-		if (!listfile.isLoaded())
+		if (!core.view.casc.listfile.isLoaded)
 			return client.sendData('ERR_LISTFILE_NOT_LOADED');
 
 		if (!this.validateParameters(client, data, { fileName: 'string' }))
 			return;
 
 		const fileName = data.fileName;
-		const fileDataID = listfile.getByFilename(fileName) ?? 0;
+		const fileDataID = core.view.casc.listfile.getByFilename(fileName) ?? 0;
 		client.sendData('LISTFILE_RESULT', { fileDataID, fileName });
 	}
 
@@ -372,14 +371,14 @@ class RCPServer {
 	 * @param {RCPConnection} client 
 	 */
 	handleListfileSearch(data, client) {
-		if (!listfile.isLoaded())
+		if (!core.view.casc.listfile.isLoaded)
 			return client.sendData('ERR_LISTFILE_NOT_LOADED');
 
 		if (!this.validateParameters(client, data, { search: 'string' }))
 			return;
 
 		const filter = data.useRegularExpression ? new RegExp(data.search, 'i') : data.search;
-		client.sendData('LISTFILE_SEARCH_RESULT', { entries: listfile.getFilteredEntries(filter) });
+		client.sendData('LISTFILE_SEARCH_RESULT', { entries: core.view.casc.listfile.getFilteredEntries(filter) });
 	}
 
 	/**

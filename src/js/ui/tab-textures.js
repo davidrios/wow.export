@@ -8,7 +8,7 @@ const log = require('../log');
 const util = require('util');
 const path = require('path');
 const generics = require('../generics');
-const listfile = require('../loader/listfile');
+const { stripFileEntry, formatUnknownFile } = require('../loader/listfile');
 const BLPFile = require('../casc/blp');
 const BufferWrapper = require('../buffer');
 const ExportHelper = require('../casc/export-helper');
@@ -24,7 +24,7 @@ let selectedFileDataID = 0;
  * @param {string} [texture]
  */
 const previewTextureByID = async (fileDataID, texture = null) => {
-	texture = texture ?? listfile.getByID(fileDataID) ?? listfile.formatUnknownFile(fileDataID);
+	texture = texture ?? core.view.casc.listfile.getByID(fileDataID) ?? formatUnknownFile(fileDataID);
 
 	core.view.isBusy++;
 	core.setToast('progress', util.format('Loading %s, please wait...', texture), null, -1, false);
@@ -86,10 +86,10 @@ const getFileInfoPair = (input) => {
 
 	if (typeof input === 'number') {
 		fileDataID = input;
-		fileName = listfile.getByID(fileDataID) ?? listfile.formatUnknownFile(fileDataID, '.blp');
+		fileName = core.view.casc.listfile.getByID(fileDataID) ?? formatUnknownFile(fileDataID, '.blp');
 	} else {
-		fileName = listfile.stripFileEntry(input);
-		fileDataID = listfile.getByFilename(fileName);
+		fileName = stripFileEntry(input);
+		fileDataID = core.view.casc.listfile.getByFilename(fileName);
 	}
 
 	return { fileName, fileDataID };
@@ -208,9 +208,9 @@ core.registerLoadFunc(async () => {
 	// Track selection changes on the texture listbox and preview first texture.
 	core.view.$watch('selectionTextures', async selection => {
 		// Check if the first file in the selection is "new".
-		const first = listfile.stripFileEntry(selection[0]);
+		const first = stripFileEntry(selection[0]);
 		if (first && !core.view.isBusy) {
-			const fileDataID = listfile.getByFilename(first);
+			const fileDataID = core.view.casc.listfile.getByFilename(first);
 			if (selectedFileDataID !== fileDataID)
 				previewTextureByID(fileDataID);
 		}

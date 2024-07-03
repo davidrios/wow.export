@@ -76,7 +76,7 @@ const constants = require('./js/constants');
 const generics = require('./js/generics');
 const updater = require('./js/updater');
 const core = require('./js/core');
-const listfile = require('./js/loader/listfile');
+const { formatUnknownFile } = require('./js/loader/listfile');
 const log = require('./js/log');
 const config = require('./js/config');
 const tactKeys = require('./js/casc/tact-keys');
@@ -395,11 +395,11 @@ document.addEventListener('click', function(e) {
 						view.userInputFilterTextures = '[' + fileDataID + ']';
 				} else {
 					// Without fileDataIDs, lookup the texture name and filter by that.
-					const fileName = listfile.getByID(fileDataID);
+					const fileName = core.view.casc.listfile.getByID(fileDataID);
 					if (fileName !== undefined)
-						view.userInputFilterTextures = listfile.getByID(fileName);
+						view.userInputFilterTextures = core.view.casc.listfile.getByID(fileName);
 					else if (view.config.enableUnknownFiles)
-						view.userInputFilterTextures = listfile.formatUnknownFile(fileDataID, '.blp');
+						view.userInputFilterTextures = formatUnknownFile(fileDataID, '.blp');
 				}
 			},
 

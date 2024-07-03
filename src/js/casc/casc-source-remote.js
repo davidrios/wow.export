@@ -12,7 +12,6 @@ const CASC = require('./casc-source');
 const VersionConfig = require('./version-config');
 const CDNConfig = require('./cdn-config');
 const BuildCache = require('./build-cache');
-const listfile = require('../loader/listfile');
 const BLTEReader = require('./blte-reader').BLTEReader;
 
 const EMPTY_HASH = '00000000000000000000000000000000';
@@ -102,7 +101,7 @@ class CASCRemote extends CASC {
 	// eslint-disable-next-line no-unused-vars
 	async getFile(fileDataID, partialDecrypt = false, suppressLog = false, supportFallback = true, forceFallback = false, contentKey = null) {
 		if (!suppressLog)
-			log.write('Loading remote CASC file %d (%s)', fileDataID, listfile.getByID(fileDataID));
+			log.write('Loading remote CASC file %d (%s)', fileDataID, this.listfile.getByID(fileDataID));
 
 		const encodingKey = contentKey !== null ? super.getEncodingKeyForContentKey(contentKey) : await super.getFile(fileDataID);
 		let data = await this.cache.getFile(encodingKey, constants.CACHE.DIR_DATA);
@@ -185,7 +184,7 @@ class CASCRemote extends CASC {
 
 		await this.loadListfile(this.build.BuildConfig);
 		await this.loadTables();
-		await listfile.setupFilterListfile();
+		await this.listfile.setupFilterListfile();
 		await this.initializeComponents();
 	}
 

@@ -6,7 +6,7 @@
 const core = require('../core');
 // const log = require('../log');
 // const generics = require('../generics');
-// const listfile = require('../loader/listfile');
+// const { stripFileEntry } = require('../loader/listfile');
 // const WDCReader = require('../db/WDCReader');
 // const path = require('path');
 
@@ -22,7 +22,7 @@ core.registerLoadFunc(async () => {
 	// // Track selection changes on the text listbox and set first as active entry.
 	// core.view.$watch('selectionDB2s', async selection => {
 	// 	// Check if the first file in the selection is "new".
-	// 	const first = listfile.stripFileEntry(selection[0]);
+	// 	const first = stripFileEntry(selection[0]);
 	// 	if (!core.view.isBusy && first && selectedFile !== first && db2NameMap !== undefined) {
 	// 		try {
 	// 			const lowercaseTableName = path.basename(first, '.db2');

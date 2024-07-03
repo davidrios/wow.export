@@ -8,7 +8,6 @@ const fsp = require('fs').promises;
 const BLPFile = require('../../casc/blp');
 const core = require('../../core');
 const log = require('../../log');
-const listfile = require('../../loader/listfile');
 const constants = require('../../constants');
 const overlay = require('../../ui/char-texture-overlay');
 
@@ -93,7 +92,7 @@ class CharMaterialRenderer {
 		// ChrCustomizationMaterial: ChrModelTextureTargetID, FileDataID (this is actually MaterialResourceID but we translate it before here) 
 
 		// For debug purposes
-		let filename = listfile.getByID(chrCustomizationMaterial.FileDataID);
+		let filename = core.view.casc.listfile.getByID(chrCustomizationMaterial.FileDataID);
 		console.log("Loading texture " + filename + " for target " + chrCustomizationMaterial.ChrModelTextureTargetID + " with alpha " + useAlpha);
 
 		this.textureTargets.push({

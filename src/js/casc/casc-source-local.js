@@ -14,7 +14,6 @@ const CDNConfig = require('./cdn-config');
 const BufferWrapper = require('../buffer');
 const BuildCache = require('./build-cache');
 const BLTEReader = require('./blte-reader').BLTEReader;
-const listfile = require('../loader/listfile');
 const core = require('../core');
 const generics = require('../generics');
 const CASCRemote = require('./casc-source-remote');
@@ -60,7 +59,7 @@ class CASCLocal extends CASC {
 	 */
 	async getFile(fileDataID, partialDecryption = false, suppressLog = false, supportFallback = true, forceFallback = false, contentKey = null) {
 		if (!suppressLog)
-			log.write('Loading local CASC file %d (%s)', fileDataID, listfile.getByID(fileDataID));
+			log.write('Loading local CASC file %d (%s)', fileDataID, this.listfile.getByID(fileDataID));
 			
 		const encodingKey = contentKey !== null ? super.getEncodingKeyForContentKey(contentKey) : await super.getFile(fileDataID);
 		const data = supportFallback ? await this.getDataFileWithRemoteFallback(encodingKey, forceFallback) : await this.getDataFile(encodingKey);
@@ -103,7 +102,7 @@ class CASCLocal extends CASC {
 
 		await this.loadListfile(this.build.BuildKey);
 		await this.loadTables();
-		await listfile.setupFilterListfile();
+		await this.listfile.setupFilterListfile();
 		await this.initializeComponents();
 	}
 

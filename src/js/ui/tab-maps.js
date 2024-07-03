@@ -7,7 +7,6 @@ const util = require('util');
 const core = require('../core');
 const log = require('../log');
 const path = require('path');
-const listfile = require('../loader/listfile');
 const constants = require('../constants');
 
 const WDCReader = require('../db/WDCReader');
@@ -109,7 +108,7 @@ const loadMapTile = async (x, y, size) => {
 		let tilePath;
 		if (md5Translate == null) {
 			tilePath = util.format('world/minimaps/%s/map%s_%s.blp', selectedMapDir, paddedX, paddedY);
-			if (!listfile.getByFilename(tilePath))
+			if (!core.view.casc.listfile.getByFilename(tilePath))
 				await loadMd5Translate();
 		}
 
@@ -147,7 +146,7 @@ const loadMapTile = async (x, y, size) => {
  */
 const collectGameObjects = async (mapID, filter) => {
 	// Load GameObjects.db2/GameObjectDisplayInfo.db2 on-demand.
-	if (gameObjectsDB2 === null && listfile.getByFilename('DBFilesClient/GameObjects.db2') != null) {
+	if (gameObjectsDB2 === null && core.view.casc.listfile.getByFilename('DBFilesClient/GameObjects.db2') != null) {
 		const objTable = new WDCReader('DBFilesClient/GameObjects.db2');
 		await objTable.parse();
 
@@ -204,7 +203,7 @@ const exportSelectedMapWMO = async () => {
 
 		if (selectedWDT.worldModel) {
 			fileName = selectedWDT.worldModel;
-			fileDataID = listfile.getByFilename(fileName);
+			fileDataID = core.view.casc.listfile.getByFilename(fileName);
 
 			if (!fileDataID)
 				throw new Error('Invalid world model path: ' + fileName);
@@ -213,7 +212,7 @@ const exportSelectedMapWMO = async () => {
 				throw new Error('Map does not define a valid world model.');
 			
 			fileDataID = placement.id;
-			fileName = listfile.getByID(fileDataID) || 'unknown_' + fileDataID + '.wmo';
+			fileName = core.view.casc.listfile.getByID(fileDataID) || 'unknown_' + fileDataID + '.wmo';
 		}
 
 		const exportPath = ExportHelper.replaceExtension(ExportHelper.getExportPath(fileName), '.obj');
@@ -317,7 +316,7 @@ core.events.once('screen-tab-maps', async () => {
 	const maps = [];
 	for (const [id, entry] of table.getAllRows()) {
 		const wdtPath = util.format('world/maps/%s/%s.wdt', entry.Directory, entry.Directory);
-		if (listfile.getByFilename(wdtPath))
+		if (core.view.casc.listfile.getByFilename(wdtPath))
 			maps.push(util.format('%d\x19[%d]\x19%s\x19(%s)', entry.ExpansionID, id, entry.MapName_lang, entry.Directory));
 	}
 

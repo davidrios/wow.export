@@ -8,7 +8,7 @@ const log = require('../log');
 const path = require('path');
 const util = require('util');
 const generics = require('../generics');
-const listfile = require('../loader/listfile');
+const { stripFileEntry } = require('../loader/listfile');
 const ExportHelper = require('../casc/export-helper');
 const EncryptionError = require('../casc/blte-reader').EncryptionError;
 
@@ -111,7 +111,7 @@ const loadSelectedTrack = async () => {
 	log.write('Previewing sound file %s', selectedFile);
 
 	try {
-		const fileDataID = listfile.getByFilename(selectedFile);
+		const fileDataID = core.view.casc.listfile.getByFilename(selectedFile);
 		data = await core.view.casc.getFile(fileDataID);
 
 		if (selectedFile.endsWith('.unk_sound')) {
@@ -178,7 +178,7 @@ core.registerLoadFunc(async () => {
 	// Track selection changes on the sound listbox and set first as active entry.
 	core.view.$watch('selectionSounds', async selection => {
 		// Check if the first file in the selection is "new".
-		const first = listfile.stripFileEntry(selection[0]);
+		const first = stripFileEntry(selection[0]);
 		if (!core.view.isBusy && first && selectedFile !== first) {
 			core.view.soundPlayerTitle = path.basename(first);
 
@@ -208,7 +208,7 @@ core.registerLoadFunc(async () => {
 				return;
 
 			let data;
-			fileName = listfile.stripFileEntry(fileName);
+			fileName = stripFileEntry(fileName);
 
 			if (fileName.endsWith('.unk_sound')) {
 				data = await core.view.casc.getFileByName(fileName);

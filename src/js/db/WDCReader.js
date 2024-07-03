@@ -68,8 +68,9 @@ class WDCReader {
 	 * Construct a new WDCReader instance.
 	 * @param {string} fileName
 	 */
-	constructor(fileName) {
+	constructor(fileName, casc) {
 		this.fileName = fileName;
+		this.casc = casc ?? core.view.casc;
 
 		this.rows = new Map();
 		this.copyTable = new Map();
@@ -155,7 +156,7 @@ class WDCReader {
 	 * @param {string} layoutHash
 	 */
 	async loadSchema(layoutHash) {
-		const casc = core.view.casc;
+		const casc = this.casc;
 		const buildID = casc.getBuildName();
 
 		const tableName = ExportHelper.replaceExtension(path.basename(this.fileName));
@@ -227,7 +228,10 @@ class WDCReader {
 		log.write('Loading DB file %s from CASC', this.fileName);
 
 		if (!data)
-			data = await core.view.casc.getFileByName(this.fileName, true, false, true);
+			data = await this.casc.getFileByName(this.fileName, true, false, true);
+
+		if (data.byteLength < 4)
+			return;
 
 		// wdc_magic
 		const magic = data.readUInt32LE();

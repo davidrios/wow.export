@@ -13,7 +13,6 @@ const core = require('../../core');
 const BufferWrapper = require('../../buffer');
 const AnimMapper = require('../AnimMapper');
 const log = require('../../log');
-const listfile = require('../../loader/listfile');
 
 const CHUNK_SFID = 0x44494653;
 const CHUNK_TXID = 0x44495854;
@@ -738,6 +737,7 @@ class M2Loader {
 	}
 
 	parseRestMD20() {
+		const listfile = core.view.casc.listfile;
 		let baseName = listfile.getByID(this.fileID);
 		baseName = baseName.substring(0, baseName.length - 3);
 

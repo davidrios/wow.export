@@ -5,7 +5,7 @@
  */
 const core = require('../../core');
 const log = require('../../log');
-const listfile = require('../../loader/listfile');
+const { formatUnknownFile } = require('../../loader/listfile');
 const path = require('path');
 const generics = require('../../generics');
 
@@ -57,6 +57,7 @@ class WMOExporter {
 	async exportTextures(out, mtl = null, helper, raw = false) {
 		const config = core.view.config;
 		const casc = core.view.casc;
+		const listfile = casc.listfile;
 
 		const textureMap = new Map();
 		const materialMap = new Map();
@@ -152,7 +153,7 @@ class WMOExporter {
 								fileName = ExportHelper.replaceExtension(fileName, '.png');
 						} else {
 							// Handle unknown files.
-							fileName = listfile.formatUnknownFile(texFile);
+							fileName = formatUnknownFile(texFile);
 						}
 
 						texPath = ExportHelper.getExportPath(fileName);
@@ -337,6 +338,7 @@ class WMOExporter {
 	 */
 	async exportAsOBJ(out, helper, fileManifest) {
 		const casc = core.view.casc;
+		const listfile = casc.listfile;
 		const obj = new OBJWriter(out);
 		const mtl = new MTLWriter(ExportHelper.replaceExtension(out, '.mtl'));
 
@@ -526,7 +528,7 @@ class WMOExporter {
 								fileName = ExportHelper.replaceExtension(fileName, '.obj');
 							} else {
 								// Handle unknown files.
-								fileName = listfile.formatUnknownFile(fileDataID, '.obj');
+								fileName = formatUnknownFile(fileDataID, '.obj');
 							}
 
 							let m2Path;
@@ -701,6 +703,7 @@ class WMOExporter {
 	 */
 	async exportRaw(out, helper, fileManifest) {
 		const casc = core.view.casc;
+		const listfile = casc.listfile;
 		const config = core.view.config;
 
 		const manifestFile = ExportHelper.replaceExtension(out, '.manifest.json');
@@ -799,7 +802,7 @@ class WMOExporter {
 					try {
 						if (fileName === undefined) {
 							// Handle unknown files.
-							fileName = listfile.formatUnknownFile(fileDataID, '.m2');
+							fileName = formatUnknownFile(fileDataID, '.m2');
 						}
 
 						let m2Path;

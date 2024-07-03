@@ -3,7 +3,6 @@
 	Authors: Kruithne <kruithne@gmail.com>
 	License: MIT
  */
-const listfile = require('../loader/listfile');
 const core = require('../core');
 
 class Texture {
@@ -24,7 +23,7 @@ class Texture {
 	 * @param {string} fileName 
 	 */
 	setFileName(fileName) {
-		this.fileDataID = listfile.getByFilename(fileName) || 0;
+		this.fileDataID = core.view.casc.listfile.getByFilename(fileName) || 0;
 	}
 
 	/**

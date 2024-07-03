@@ -5,7 +5,6 @@
  */
 
 const util = require('util');
-const listfile = require('../loader/listfile');
 const core = require('../core');
 
 const MAGIC_SKIN = 0x4E494B53;
@@ -13,7 +12,7 @@ const MAGIC_SKIN = 0x4E494B53;
 class Skin {
 	constructor(fileDataID) {
 		this.fileDataID = fileDataID;
-		this.fileName = listfile.getByIDOrUnknown(fileDataID, '.skin');
+		this.fileName = core.view.casc.listfile.getByIDOrUnknown(fileDataID, '.skin');
 		this.isLoaded = false;
 	}
 
