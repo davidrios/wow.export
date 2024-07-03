@@ -354,7 +354,7 @@ class MPQ {
 		return this.remoteCASC;
 	}
 
-	async loadItems(itemSlotsIgnored) {
+	async getItemsData(itemSlotsIgnored) {
 		log.write('Loading MPQ items');
 
 		const progress = core.createProgress(2 + this.remoteCASCProgressSteps);

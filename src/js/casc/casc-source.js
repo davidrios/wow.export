@@ -20,6 +20,7 @@ const DBModelFileData = require('../db/caches/DBModelFileData');
 const DBTextureFileData = require('../db/caches/DBTextureFileData');
 const DBItemDisplays = require('../db/caches/DBItemDisplays');
 const DBCreatures = require('../db/caches/DBCreatures');
+const MultiMap = require('../MultiMap');
 
 const ENC_MAGIC = 0x4E45;
 const ROOT_MAGIC = 0x4D465354;
@@ -488,6 +489,112 @@ class CASC {
 	 */
 	cleanup() {
 		this.unhookConfig();
+	}
+
+	async getItemsData(itemSlotsIgnored) {
+		const progress = core.createProgress(5);
+
+		await progress.step('Loading item data...');
+		const itemSparse = new WDCReader('DBFilesClient/ItemSparse.db2');
+		await itemSparse.parse();
+
+		await progress.step('Loading item display info...');
+		const itemDisplayInfo = new WDCReader('DBFilesClient/ItemDisplayInfo.db2');
+		await itemDisplayInfo.parse();
+
+		await progress.step('Loading item appearances...');
+		const itemModifiedAppearance = new WDCReader('DBFilesClient/ItemModifiedAppearance.db2');
+		await itemModifiedAppearance.parse();
+
+		await progress.step('Loading item materials...');
+		const itemDisplayInfoMaterialRes = new WDCReader('DBFilesClient/ItemDisplayInfoMaterialRes.db2');
+		await itemDisplayInfoMaterialRes.parse();
+
+		const itemAppearance = new WDCReader('DBFilesClient/ItemAppearance.db2');
+		await itemAppearance.parse();
+
+		await progress.step('Building item relationships...');
+
+		const itemSparseRows = itemSparse.getAllRows();
+		const items = [];
+
+		const appearanceMap = new Map();
+		for (const row of itemModifiedAppearance.getAllRows().values())
+			appearanceMap.set(row.ItemID, row.ItemAppearanceID);
+
+		const materialMap = new MultiMap();
+		for (const row of itemDisplayInfoMaterialRes.getAllRows().values())
+			materialMap.set(row.ItemDisplayInfoID, row.MaterialResourcesID);
+
+		for (const [itemID, itemRow] of itemSparseRows) {
+			if (itemSlotsIgnored.includes(itemRow.inventoryType))
+				continue;
+
+			const itemAppearanceID = appearanceMap.get(itemID);
+			const itemAppearanceRow = itemAppearance.getRow(itemAppearanceID);
+
+			let materials = null;
+			let models = null;
+			if (itemAppearanceRow !== null) {
+				materials = [];
+				models = [];
+
+				const itemDisplayInfoRow = itemDisplayInfo.getRow(itemAppearanceRow.ItemDisplayInfoID);
+				if (itemDisplayInfoRow !== null) {
+					materials.push(...itemDisplayInfoRow.ModelMaterialResourcesID);
+					models.push(...itemDisplayInfoRow.ModelResourcesID);
+				}
+
+				const materialRes = materialMap.get(itemAppearanceRow.ItemDisplayInfoID);
+				if (materialRes !== undefined)
+					Array.isArray(materialRes) ? materials.push(...materialRes) : materials.push(materialRes);
+
+				materials = materials.filter(e => e !== 0);
+				models = models.filter(e => e !== 0);
+			}
+
+			items.push([itemID, itemRow, itemAppearanceRow, materials, models]);
+		}
+
+		if (core.view.config.itemViewerShowAll) {
+			const itemDB = new WDCReader('DBFilesClient/Item.db2');
+			await itemDB.parse();
+
+			for (const [itemID, itemRow] of itemDB.getAllRows()) {
+				if (itemSlotsIgnored.includes(itemRow.inventoryType))
+					continue;
+
+				if (itemSparseRows.has(itemID))
+					continue;
+
+				const itemAppearanceID = appearanceMap.get(itemID);
+				const itemAppearanceRow = itemAppearance.getRow(itemAppearanceID);
+
+				let materials = null;
+				let models = null;
+				if (itemAppearanceRow !== null) {
+					materials = [];
+					models = [];
+
+					const itemDisplayInfoRow = itemDisplayInfo.getRow(itemAppearanceRow.ItemDisplayInfoID);
+					if (itemDisplayInfoRow !== null) {
+						materials.push(...itemDisplayInfoRow.ModelMaterialResourcesID);
+						models.push(...itemDisplayInfoRow.ModelResourcesID);
+					}
+
+					const materialRes = materialMap.get(itemAppearanceRow.ItemDisplayInfoID);
+					if (materialRes !== undefined)
+						Array.isArray(materialRes) ? materials.push(...materialRes) : materials.push(materialRes);
+
+					materials = materials.filter(e => e !== 0);
+					models = models.filter(e => e !== 0);
+				}
+
+				items.push([itemID, itemRow, null, null, null]);
+			}
+		}
+
+		return items;
 	}
 
 	async getCharactersInformation (progress) {
