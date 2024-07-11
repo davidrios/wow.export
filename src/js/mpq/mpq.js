@@ -262,7 +262,10 @@ class MPQReader {
 	}
 
 	async getFileList() {
-		return (await this.readFile('(listfile)')).readString().split(/[\r\n;]+/);
+		return (await this.readFile('(listfile)'))
+			.readString()
+			.split(/[\r\n;]+/)
+			.filter(name => name.length > 0);
 	}
 }
 

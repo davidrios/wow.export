@@ -98,28 +98,21 @@ class WMORenderer {
 	/**
 	 * Load all textures needed for the WMO model.
 	 */
-	loadTextures() {
+	async loadTextures() {
 		const wmo = this.wmo;
 		const materialCount = wmo.materials.length;
 		const materials = this.materials = new Array(materialCount);
 
 		this.syncID = textureRibbon.reset();
 
-		const isClassic = !!wmo.textureNames;
 		for (let i = 0; i < materialCount; i++) {
 			const material = wmo.materials[i];
 			const texture = new Texture(material.flags);
 
-			if (isClassic) {
-				texture.setFileName(wmo.textureNames[material.texture1]);
-			}
+			if (material.shader == 23 && material.texture2 > 0)
+				texture.fileDataID = material.texture2;
 			else
-			{
-				if (material.shader == 23)
-					texture.fileDataID = material.texture2;
-				else
-					texture.fileDataID = material.texture1;
-			}
+				texture.fileDataID = material.texture1;
 
 			materials[i] = DEFAULT_MATERIAL;
 
@@ -157,15 +150,15 @@ class WMORenderer {
 			}
 
 			// Include texture2/texture3 in the texture ribbon.
-			this.loadAuxiliaryTextureForRibbon(material.texture2, wmo);
-			this.loadAuxiliaryTextureForRibbon(material.texture3, wmo);
+			await this.loadAuxiliaryTextureForRibbon(material.texture2);
+			await this.loadAuxiliaryTextureForRibbon(material.texture3);
 
 			if (material.shader == 23) {
-				this.loadAuxiliaryTextureForRibbon(material.color3, wmo);
-				this.loadAuxiliaryTextureForRibbon(material.runtimeData[0], wmo);
-				this.loadAuxiliaryTextureForRibbon(material.runtimeData[1], wmo);
-				this.loadAuxiliaryTextureForRibbon(material.runtimeData[2], wmo);
-				this.loadAuxiliaryTextureForRibbon(material.runtimeData[3], wmo);
+				await this.loadAuxiliaryTextureForRibbon(material.color3);
+				await this.loadAuxiliaryTextureForRibbon(material.runtimeData[0]);
+				await this.loadAuxiliaryTextureForRibbon(material.runtimeData[1]);
+				await this.loadAuxiliaryTextureForRibbon(material.runtimeData[2]);
+				await this.loadAuxiliaryTextureForRibbon(material.runtimeData[3]);
 			}
 		}
 	}
@@ -175,12 +168,9 @@ class WMORenderer {
 	 * @param {number|string} textureID 
 	 * @param {WMOLoader} wmo
 	 */
-	async loadAuxiliaryTextureForRibbon(textureID, wmo) {
+	async loadAuxiliaryTextureForRibbon(textureID) {
 		if (!this.useRibbon)
 			return;
-
-		if (wmo.textureNames)
-			textureID = core.view.casc.listfile.getByFilename(textureID) || 0;
 
 		if (textureID > 0) {
 			const ribbonSlot = textureRibbon.addSlot();

@@ -54,6 +54,14 @@ class WMOLoader {
 		// Mark this instance as loaded.
 		this.loaded = true;
 		this.data = undefined;
+
+		if (this.textureNames != null) {
+			for (const material of this.materials) {
+				material.texture1 = core.view.casc.listfile.getByFilename(this.textureNames[material.texture1]) ?? 0;
+				material.texture2 = core.view.casc.listfile.getByFilename(this.textureNames[material.texture2] ?? '') ?? 0;
+				material.texture3 = core.view.casc.listfile.getByFilename(this.textureNames[material.texture3] ?? '') ?? 0;
+			}
+		}
 	}
 
 	/**
