@@ -24,6 +24,7 @@ const WMORenderer = require('../3D/renderers/WMORenderer');
 const WMOExporter = require('../3D/exporters/WMOExporter');
 
 const textureRibbon = require('./texture-ribbon');
+const TabTextures = require('./tab-textures');
 // const AnimMapper = require('../3D/AnimMapper');
 
 const MODEL_TYPE_M2 = Symbol('modelM2');
@@ -36,6 +37,7 @@ const exportExtensions = {
 
 const activeSkins = new Map();
 let selectedVariantTextureIDs = new Array();
+let selectedOtherVariantTextureIDs = new Array();
 let selectedSkinName = null;
 
 let isFirstModel = true;
@@ -134,6 +136,7 @@ const previewModel = async (fileName) => {
 		// Clear the active skin map.
 		activeSkins.clear();
 		selectedVariantTextureIDs.length = 0;
+		selectedOtherVariantTextureIDs.length = 0;
 		selectedSkinName = null;
 
 		const fileDataID = listfile.getByFilename(fileName);
@@ -423,6 +426,9 @@ const exportFiles = async (files, isLocal = false, exportID = -1) => {
 								await exportPaths?.writeLine('M2_GLTF:' + exportPath);
 							}
 
+							if (selectedOtherVariantTextureIDs.length > 0)
+								TabTextures.exportFiles(selectedOtherVariantTextureIDs, false, -1, false);
+
 							// Abort if the export has been cancelled.
 							if (helper.isCancelled())
 								return;
@@ -541,36 +547,46 @@ core.registerLoadFunc(async () => {
 		if (!activeRenderer || activeSkins.size === 0)
 			return;
 
-		// Skin selector is single-select, should only be one item.
-		const selected = selection[0];
-		const display = activeSkins.get(selected.id);
-		selectedSkinName = selected.id;
+		selectedOtherVariantTextureIDs = [];
 
-		let currGeosets = core.view.modelViewerGeosets;
+		for (let i = 0; i < selection.length; i++) {
+			// Skin selector is single-select, should only be one item.
+			const selected = selection[i];
+			const display = activeSkins.get(selected.id);
+			if (i === 0)
+				selectedSkinName = selected.id;
 
-		if (display.extraGeosets !== undefined) {
-			for (const geoset of currGeosets) {
-				if (geoset.id > 0 && geoset.id < 900)
-					geoset.checked = false;
-			}
+			let currGeosets = core.view.modelViewerGeosets;
 
-			for (const extraGeoset of display.extraGeosets) {
+			if (display.extraGeosets !== undefined) {
 				for (const geoset of currGeosets) {
-					if (geoset.id === extraGeoset)
-						geoset.checked = true;
+					if (geoset.id > 0 && geoset.id < 900)
+						geoset.checked = false;
+				}
+
+				for (const extraGeoset of display.extraGeosets) {
+					for (const geoset of currGeosets) {
+						if (geoset.id === extraGeoset)
+							geoset.checked = true;
+					}
+				}
+			} else {
+				for (const geoset of currGeosets) {
+					const id = geoset.id.toString();
+					geoset.checked = (id.endsWith('0') || id.endsWith('01'));
 				}
 			}
-		} else {
-			for (const geoset of currGeosets) {
-				const id = geoset.id.toString();
-				geoset.checked = (id.endsWith('0') || id.endsWith('01'));
+
+			if (i === 0) {
+				if (display.textures.length > 0)
+					selectedVariantTextureIDs = [...display.textures];
+	
+				activeRenderer.applyReplaceableTextures(display);
+			} else {
+				for (const tex of display.textures)
+					selectedOtherVariantTextureIDs.push(tex);
 			}
 		}
-
-		if (display.textures.length > 0)
-			selectedVariantTextureIDs = [...display.textures];
-
-		activeRenderer.applyReplaceableTextures(display);
 	});
 
 	core.view.$watch('config.modelViewerShowGrid', () => {

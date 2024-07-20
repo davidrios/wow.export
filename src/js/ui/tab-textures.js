@@ -94,7 +94,7 @@ const getFileInfoPair = (input) => {
 	return { fileName, fileDataID };
 };
 
-const exportFiles = async (files, isLocal = false, exportID = -1) => {
+const exportFiles = async (files, isLocal = false, exportID = -1, exportMeta) => {
 	const format = core.view.config.exportTextureFormat;
 
 	if (format === 'CLIPBOARD') {
@@ -119,7 +119,8 @@ const exportFiles = async (files, isLocal = false, exportID = -1) => {
 	const exportPaths = core.openLastExportStream();
 
 	const overwriteFiles = isLocal || core.view.config.overwriteFiles;
-	const exportMeta = core.view.config.exportBLPMeta;
+	if (exportMeta === undefined)
+		exportMeta = core.view.config.exportBLPMeta;
 
 	const manifest = { type: 'TEXTURES', exportID, succeeded: [], failed: [] };
 
@@ -237,4 +238,4 @@ core.registerLoadFunc(async () => {
 	});
 });
 
-module.exports = { previewTextureByID };
+module.exports = { previewTextureByID, exportFiles };

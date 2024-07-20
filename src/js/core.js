@@ -85,6 +85,7 @@ const newView = () => {
 		modelViewerGeosets: [], // Active M2 model geoset control.
 		modelViewerSkins: [], // Active M2 model skins.
 		modelViewerSkinsSelection: [], // Selected M2 model skins.
+		modelViewerGeosetsToAddInvertedSelection: [], // Selected M2 model geosets to add inverted.
 		modelViewerAnims: [], // Available animations.
 		modelViewerAnimSelection: [], // Selected M2 model animation (single).
 		modelViewerWMOGroups: [], // Active WMO model group control.
