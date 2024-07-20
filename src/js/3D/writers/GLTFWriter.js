@@ -115,8 +115,8 @@ class GLTFWriter {
 	 * Set the normals array for this writer.
 	 * @param {Array} normals 
 	 */
-	setNormalArray(normals) {
-		this.normals = normals;
+	addNormalsArray(normals) {
+		this.normals.push(normals);
 	}
 
 	/**
@@ -157,8 +157,8 @@ class GLTFWriter {
 	 * @param {Array} triangles
 	 * @param {string} matName 
 	 */
-	addMesh(name, triangles, matName) {
-		this.meshes.push({ name, triangles, matName });
+	addMesh(name, triangles, matName, normalsSet = 0) {
+		this.meshes.push({ name, triangles, matName, normalsSet });
 	}
 
 	async write(overwrite = true) {
@@ -204,13 +204,13 @@ class GLTFWriter {
 					byteOffset: 0,
 					target: GLTF_ARRAY_BUFFER
 				},
-				{
+				...this.normals.map(() => ({
 					// Normals ARRAY_BUFFER
 					buffer: 0,
 					byteLength: 0,
 					byteOffset: 0,
 					target: GLTF_ARRAY_BUFFER
-				}
+				}))
 			],
 			accessors: [
 				{
@@ -222,15 +222,15 @@ class GLTFWriter {
 					count: 0,
 					type: 'VEC3'
 				},
-				{
+				...this.normals.map((_, idx) => ({
 					// Normals (Float)
 					name: 'NORMAL',
-					bufferView: 1,
+					bufferView: idx + 1,
 					byteOffset: 0,
 					componentType: GLTF_FLOAT,
 					count: 0,
 					type: 'VEC3'
-				},
+				}))
 			],
 			meshes: [],
 			scene: 0
@@ -926,7 +926,8 @@ class GLTFWriter {
 		};
 
 		writeData(0, this.vertices, 3, GLTF_FLOAT);
-		writeData(1, this.normals, 3, GLTF_FLOAT);
+		for (let i = 0; i < this.normals.length; i++)
+			writeData(i + 1, this.normals[i], 3, GLTF_FLOAT);
 
 		if (bones.length > 0) {
 			writeData(idx_bone_joints, this.boneIndices, 4, GLTF_UNSIGNED_BYTE);
@@ -1015,7 +1016,7 @@ class GLTFWriter {
 			root.meshes.push({
 				primitives: [
 					{
-						attributes: primitive_attributes,
+						attributes: {...primitive_attributes, NORMAL: mesh.normalsSet + 1},
 						indices: accessorIndex,
 						mode: GLTF_TRIANGLES,
 						material: materialMap.get(mesh.matName)

@@ -297,8 +297,12 @@ class M2Exporter {
 			gltf.setBonesArray(this.m2.bones);
 		}
 
+		const addInvertedGeosets = core.view.config.modelsExportAddInvertedGeosets && core.view.modelViewerGeosetsToAddInvertedSelection.length > 0;
+
 		gltf.setVerticesArray(this.m2.vertices);
-		gltf.setNormalArray(this.m2.normals);
+		gltf.addNormalsArray(this.m2.normals);
+		if (addInvertedGeosets)
+			gltf.addNormalsArray(this.m2.normals.map(n => n * -1));
 		gltf.setBoneWeightArray(this.m2.boneWeights);
 		gltf.setBoneIndexArray(this.m2.boneIndices)
 
@@ -307,6 +311,16 @@ class M2Exporter {
 
 		const textureMap = await this.exportTextures(outDir, false, null, helper, true);
 		gltf.setTextureMap(textureMap);
+
+		let trianglesInv = null;
+		let geosetsToInvert = null;
+		if (addInvertedGeosets) {
+			trianglesInv = skin.triangles.concat();
+			for (var j = 0; j < trianglesInv.length; j += 3)
+				[trianglesInv[j + 1], trianglesInv[j]] = [trianglesInv[j], trianglesInv[j + 1]];
+
+			geosetsToInvert = core.view.modelViewerGeosetsToAddInvertedSelection.map(i => i.label);
+		}
 
 		for (let mI = 0, mC = skin.subMeshes.length; mI < mC; mI++) {
 			// Skip geosets that are not enabled.
@@ -332,7 +346,16 @@ class M2Exporter {
 				console.log("Setting meshIndex " + mI + " to " + matName);
 			}
 
-			gltf.addMesh(GeosetMapper.getGeosetName(mI, mesh.submeshID), indices, matName);
+			const geosetName = GeosetMapper.getGeosetName(mI, mesh.submeshID);
+			gltf.addMesh(geosetName, indices, matName, 0);
+
+			if (addInvertedGeosets && geosetsToInvert.indexOf(geosetName) !== -1) {
+				const indicesInv = new Array(mesh.triangleCount);
+				for (let vI = 0; vI < mesh.triangleCount; vI++)
+					indicesInv[vI] = skin.indices[trianglesInv[mesh.triangleStart + vI]];
+
+				gltf.addMesh(geosetName + '__inv', indicesInv, matName, 1);
+			}
 		}
 
 		await gltf.write(core.view.config.overwriteFiles);

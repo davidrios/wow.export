@@ -569,6 +569,12 @@
 								<input type="checkbox" v-model="config.modelsExportAnimations"/>
 								<span>Export animations</span>
 							</label>
+							<template v-if="config.exportModelFormat === 'GLTF'">
+								<label class="ui-checkbox" title="Create an inverted copy of selected geosets">
+									<input type="checkbox" v-model="config.modelsExportAddInvertedGeosets"/>
+									<span>Add inverted geosets</span>
+								</label>
+							</template>
 							<template v-if="config.exportModelFormat === 'RAW'">
 								<label class="ui-checkbox" title="Export raw .skin files with M2 exports">
 									<input type="checkbox" v-model="config.modelsExportSkin"/>
@@ -599,7 +605,11 @@
 								</div>
 								<template v-if="config.modelsExportTextures">
 									<span class="header">Skins</span>
-									<listboxb :items="modelViewerSkins" :selection="modelViewerSkinsSelection" :single="true"></listboxb>
+									<listboxb :items="modelViewerSkins" :selection="modelViewerSkinsSelection" :single="false"></listboxb>
+								</template>
+								<template v-if="config.exportModelFormat === 'GLTF' && config.modelsExportAddInvertedGeosets">
+									<span class="header">Geosets to add inverted</span>
+									<listboxb :items="modelViewerGeosets" :selection="modelViewerGeosetsToAddInvertedSelection" :single="false"></listboxb>
 								</template>
 								<!--<template v-if="config.exportModelFormat === 'GLTF'">
 									<span class="header">Animations</span>
