@@ -28,12 +28,15 @@
 		"request": "^2.88.0",
 		"sass": "^1.52.1",
 		"ssh2-sftp-client": "^9.0.4",
-		"terser": "^5.14.2",
 		"tar": "^5.0.10",
+		"terser": "^5.14.2",
 		"uuid": "^3.3.3"
 	},
 	"devDependencies": {
+		"@msgpack/msgpack": "^2.8.0",
 		"eslint": "^6.8.0",
-		"eslint-plugin-vue": "^6.1.2"
+		"eslint-plugin-vue": "^6.1.2",
+		"vite": "^5.3.5",
+		"wait-on": "^7.2.0"
 	}
 }

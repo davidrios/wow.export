@@ -679,6 +679,8 @@ const deflateBuffer = util.promisify(zlib.deflate);
 		// Apply manifest properties defined in the config.
 		Object.assign(manifest, config.manifest);
 
+		Object.assign(manifest, build.manifest || {});
+
 		// Apply build specific meta data to the manifest.
 		Object.assign(manifest, { flavour: build.name, guid: buildGUID });
 

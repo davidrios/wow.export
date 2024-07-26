@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const sass = require('sass');
 const childProcess = require('child_process');
+const waitOn = require('wait-on');
+const { createServer } = require('vite');
 
 const nwPath = './bin/win-x64-debug/nw.exe';
 const srcDir = './src/';
@@ -38,6 +40,18 @@ const appScss = './src/app.scss';
 				console.error('Failed to compile application css: %s', err);
 			}
 		});
+	});
+
+	const viteServer = await createServer({
+		configFile: false,
+		root: path.join(__dirname, 'src'),
+		server: { port: 4175 }
+	})
+	viteServer.listen();
+
+	await waitOn({
+		resources: ['http-get://localhost:4175'],
+		headers: { 'accept': 'text/html' },
 	});
 
 	// Launch nw.exe

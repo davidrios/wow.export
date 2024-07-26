@@ -11,8 +11,9 @@
         "BUILD_RELEASE": true,
         "chrome": true,
         "crash": true,
-		"getErrorDump": true,
-		"BigInt": true
+        "getErrorDump": true,
+        "BigInt": true,
+        "mainWindow": true
     },
     "env": {
         "browser": true,
