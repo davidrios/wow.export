@@ -442,6 +442,10 @@
 	.list-container{
 		min-width: 20vw;
 	}
+
+	.filter2 {
+		grid-column: 2;
+	}
 }
 
 .filter {
@@ -485,7 +489,7 @@
 		padding-top: 3px;
 	}
 
-	.ui-listbox {
+	.ui-listbox, .ui-datatable {
 		position: absolute;
 		top: 0;
 		left: 0;
@@ -494,11 +498,7 @@
 	}
 
 	.ui-datatable {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0px;
+		height: auto;
 	}
 }
 

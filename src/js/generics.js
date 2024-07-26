@@ -364,6 +364,25 @@ const formatPlaybackSeconds = (seconds) => {
 	return Math.floor(seconds / 60).toString().padStart(2, 0) + ':' + Math.round(seconds % 60).toString().padStart(2, 0);
 };
 
+const debouncedRef = (value, delay = 200) => {
+	let timeout
+	return Vue.customRef((track, trigger) => {
+		return {
+			get() {
+				track()
+				return value
+			},
+			set(newValue) {
+				clearTimeout(timeout)
+				timeout = setTimeout(() => {
+					value = newValue
+					trigger()
+				}, delay)
+			}
+		}
+	})
+}
+
 module.exports = { 
 	getJSON,
 	readJSON,
@@ -379,5 +398,6 @@ module.exports = {
 	fileExists,
 	readFile,
 	deleteDirectory,
-	formatPlaybackSeconds
+	formatPlaybackSeconds,
+	debouncedRef
 };

@@ -52,7 +52,6 @@ const newView = () => {
 		userInputFilterModels: '', // Value of the 'filter' field for models.
 		userInputFilterMaps: '', // Value of the 'filter' field for maps.
 		userInputFilterItems: '', // Value of the 'filter' field of items.
-		userInputFilterDB2s: '', // Value of the 'filter' field of DBs.
 		userInputFilterRaw: '', // Value of the 'filter' field for raw files.
 		userInputFilterInstall: '', // Value of the 'filter' field for install files.
 		selectionTextures: [], // Current user selection of texture files.
@@ -62,7 +61,6 @@ const newView = () => {
 		selectionText: [], // Current user selection of text files.
 		selectionMaps: [], // Current user selection of maps.
 		selectionItems: [], // Current user selection of items.
-		selectionDB2s: [], // Current user selection of DB2s.
 		selectionRaw: [], // Current user selection of raw files.
 		selectionInstall: [], // Current user selection of install files.
 		listfileTextures: [], // Filtered listfile for texture files.
@@ -75,8 +73,6 @@ const newView = () => {
 		listfileRaw: [], // Full raw file listfile.
 		listfileInstall: [], // Filtered listfile for install files.
 		installTags: [], // Install manifest tags.
-		tableBrowserHeaders: [], // DB2 headers
-		tableBrowserRows: [], // DB2 rows
 		availableLocale: Locale, // Available CASC locale.
 		fileDropPrompt: null, // Prompt to display for file drag/drops.
 		textViewerSelectedText: '', // Active text for the text viewer.

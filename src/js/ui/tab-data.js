@@ -3,56 +3,129 @@
 	Authors: Kruithne <kruithne@gmail.com>, Marlamin <marlamin@marlamin.com>
 	License: MIT
  */
-const core = require('../core');
-// const log = require('../log');
-// const generics = require('../generics');
-// const listfile = require('../casc/listfile');
-// const WDCReader = require('../db/WDCReader');
-// const path = require('path');
+const log = require('../log');
+const generics = require('../generics');
+const listfile = require('../casc/listfile');
+const WDCReader = require('../db/WDCReader');
+const path = require('path');
 
-// let selectedFile = null;
-// let db2NameMap = undefined;
+const { inject, ref } = Vue;
 
-core.registerLoadFunc(async () => {
-	return;
+module.exports = {
+	setup() {
+		const view = inject('view');
 
-	// log.write('Downloading DB2 filename mapping from %s', "https://api.wow.tools/databases/");
-	// generics.getJSON("https://api.wow.tools/databases/").then(raw => db2NameMap = raw);
+		const fileSelection = ref([]);
+		const fileFilter = generics.debouncedRef('');
+		const tableHeaders = ref([]);
+		const tableRows = ref([]);
+		const tableFilter = generics.debouncedRef('');
 
-	// // Track selection changes on the text listbox and set first as active entry.
-	// core.view.$watch('selectionDB2s', async selection => {
-	// 	// Check if the first file in the selection is "new".
-	// 	const first = listfile.stripFileEntry(selection[0]);
-	// 	if (!core.view.isBusy && first && selectedFile !== first && db2NameMap !== undefined) {
-	// 		try {
-	// 			const lowercaseTableName = path.basename(first, '.db2');
-	// 			const tableName = db2NameMap.find(e => e.name == lowercaseTableName)?.displayName;
+		let lastLoaded = null;
+		let db2NameMap = null;
+		// Keep track of loading order so an earlier load doesn't affect the UI
+		let currentLoadIteration = 0;
 
-	// 			const db2Reader = new WDCReader('DBFilesClient/' + tableName + '.db2');
-	// 			await db2Reader.parse();
-				
-	// 			core.view.tableBrowserHeaders = [...db2Reader.schema.keys()];
+		async function loadSelected(selected) {
+			if (view.isBusy)
+				return;
 
-	// 			const rows = db2Reader.getAllRows();
-	// 			if (rows.size == 0) 
-	// 				core.setToast('info', 'Selected DB2 has no rows.', null);
-	// 			else 
-	// 				core.hideToast(false);
+			if (selected == null) {
+				tableHeaders.value = [];
+				tableRows.value = [];
+				tableFilter.value = '';
+				lastLoaded = null;
+				return;
+			}
 
-	// 			const parsed = Array(rows.size);
+			const first = listfile.stripFileEntry(selected);
+			if (!first || lastLoaded === first)
+				return;
 
-	// 			let index = 0;
-	// 			for (const row of rows.values())
-	// 				parsed[index++] = Object.values(row);
+			tableHeaders.value = [];
+			tableRows.value = [];
+			tableFilter.value = '';
 
-	// 			core.view.tableBrowserRows = parsed;
+			lastLoaded = first;
+			const myLoadIteration = ++currentLoadIteration;
 
-	// 			selectedFile = first;
-	// 		} catch (e) {
-	// 			// Error reading/parsing DB2 file.
-	// 			core.setToast('error', 'Unable to open DB2 file ' + first, { 'View Log': () => log.openRuntimeLog() }, -1);
-	// 			log.write('Failed to open CASC file: %s', e.message);
-	// 		}
-	// 	}
-	// });
-});
+			view.setToast('progress', `Loading ${first}, please wait...`, null, -1, false);
+
+			try {
+				if (db2NameMap == null) {
+					db2NameMap = Object.fromEntries(
+						(await generics.getJSON("https://api.wow.tools/databases/"))
+							.map(({name, displayName}) => [name, displayName])
+					);
+				}
+				if (myLoadIteration !== currentLoadIteration)
+					return;
+
+				const lowercaseTableName = path.basename(first, '.db2');
+				const tableName = db2NameMap[lowercaseTableName];
+				if (tableName == null)
+					throw new Error(`Display name not found for ${lowercaseTableName}`);
+
+				const db2Reader = new WDCReader(`DBFilesClient/${tableName}.db2`);
+				await db2Reader.parse();
+				if (myLoadIteration !== currentLoadIteration)
+					return;
+
+				const rows = db2Reader.getAllRows();
+
+				if (rows.size == 0)
+					view.setToast('info', 'Selected DB2 has no rows.', null);
+				else
+					view.hideToast(false);
+
+				const parsed = new Array(rows.size);
+
+				let index = 0;
+				for (const row of rows.values())
+					parsed[index++] = Object.values(row);
+
+				tableHeaders.value = [...db2Reader.schema.keys()];
+				tableRows.value = parsed;
+			} catch (e) {
+				// Error reading/parsing DB2 file.
+				if (myLoadIteration === currentLoadIteration)
+					view.setToast('error', 'Unable to open DB2 file ' + selected, { 'View Log': () => log.openRuntimeLog() }, -1);
+
+				log.write('Failed to open CASC file: %s', e.message);
+			}
+		}
+
+		return {
+			view,
+			config: view.config,
+			selection: fileSelection,
+			fileFilter,
+			tableHeaders,
+			tableRows,
+			tableFilter,
+			loadSelected
+		}
+	},
+	template: `
+		<div class="tab list-tab" id="tab-data">
+			<div class="list-container">
+				<listbox v-model:selection="selection" :items="view.listfileDB2s" :filter="fileFilter" :keyinput="true"
+					:regex="config.regexFilters" :copydir="config.copyFileDirectories" :pasteselection="config.pasteSelection"
+					:copytrimwhitespace="config.removePathSpacesCopy" :includefilecount="false" unittype="db2 file" :single="true"
+					@update:selection="loadSelected($event[0])"
+				></listbox>
+			</div>
+			<div class="filter">
+				<div class="regex-info" v-if="config.regexFilters" :title="regexTooltip">Regex Enabled</div>
+				<input type="text" v-model="fileFilter" placeholder="Filter DB2s..." />
+			</div>
+			<div class="list-container">
+				<data-table :headers="tableHeaders" :rows="tableRows" :filter="tableFilter" :regex="config.regexFilters"></data-table>
+			</div>
+			<div class="filter filter2">
+				<div class="regex-info" v-if="config.regexFilters" :title="regexTooltip">Regex Enabled</div>
+				<input type="text" v-model="tableFilter" placeholder="Filter rows..." />
+			</div>
+		</div>
+	`
+}

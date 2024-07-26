@@ -115,7 +115,7 @@ require('./js/ui/tab-text.js');
 require('./js/ui/tab-models');
 require('./js/ui/tab-maps');
 require('./js/ui/tab-items');
-require('./js/ui/tab-data');
+const TabData = require('./js/ui/tab-data');
 require('./js/ui/tab-raw');
 require('./js/ui/tab-install');
 require('./js/ui/tab-characters');
@@ -155,7 +155,14 @@ document.addEventListener('click', function(e) {
 		created() {
 			core.view = this;
 		},
+		provide() {
+			return {
+				view: this
+			}
+		},
 		methods: {
+			setToast: core.setToast,
+			hideToast: core.hideToast,
 			/**
 			 * Invoked when the user chooses to manually install the Blender add-on.
 			 */
@@ -347,14 +354,6 @@ document.addEventListener('click', function(e) {
 			 */
 			emit: function(tag, ...params) {
 				core.events.emit(tag, ...params);
-			},
-
-			/**
-			 * Hide the toast bar.
-			 * @param {boolean} userCancel
-			 */
-			hideToast: function(userCancel = false) {
-				core.hideToast(userCancel)
 			},
 
 			/**
@@ -589,6 +588,7 @@ document.addEventListener('click', function(e) {
 	app.component('DataTable', DataTable);
 	app.component('ResizeLayer', ResizeLayer);
 	app.component('ContextMenu', ContextMenu);
+	app.component('TabData', TabData);
 	app.mount('#container');
 
 	// Log some basic information for potential diagnostics.

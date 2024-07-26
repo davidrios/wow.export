@@ -22,7 +22,7 @@
 						<div class="option" id="nav-videos" @click="setScreen('tab-video')" :class="{ active: screen === 'tab-video' }">Videos</div>
 						<div class="option" id="nav-maps" @click="setScreen('tab-maps')" :class="{ active: screen === 'tab-maps' }">Maps</div>
 						<div class="option" id="nav-text" @click="setScreen('tab-text')" :class="{ active: screen === 'tab-text' }">Text</div>
-						<!--<div class="option" id="nav-data" @click="setScreen('tab-data')" :class="{ active: screen === 'tab-data' }">Data</div>-->
+						<div class="option" id="nav-data" @click="setScreen('tab-data')" :class="{ active: screen === 'tab-data' }">Databases</div>
 					</template>
 					<div id="nav-extra" v-if="!isBusy" @click="contextMenus.stateNavExtra = true"></div>
 					<context-menu @close="contextMenus.stateNavExtra = false" :node="contextMenus.stateNavExtra" id="menu-extra">
@@ -794,20 +794,7 @@
 					</div>
 				</div>
 
-				<div class="tab list-tab" id="tab-data" v-if="screen === 'tab-data'">
-					<div class="list-container">
-						<listbox v-model:selection="selectionDB2s" :items="listfileDB2s" :filter="userInputFilterDB2s" :keyinput="true"
-							:regex="config.regexFilters" :copydir="config.copyFileDirectories" :pasteselection="config.pasteSelection"
-							:copytrimwhitespace="config.removePathSpacesCopy" :includefilecount="false" unittype="db2 file" :single="true"></listbox>
-					</div>
-					<div class="filter">
-						<div class="regex-info" v-if="config.regexFilters" :title="regexTooltip">Regex Enabled</div>
-						<input type="text" v-model="userInputFilterDB2s" placeholder="Filter DB2s.." />
-					</div>
-					<div class="list-container">
-						<data-table :headers="tableBrowserHeaders" :rows="tableBrowserRows"></data-table>
-					</div>
-				</div>
+				<tab-data v-show="screen === 'tab-data'"></tab-data>
 
 				<div id="source-select" v-if="screen === 'source-select'">
 					<div id="source-local" :class="{ disabled: !!availableLocalBuilds }" @click="click('source-local', $event)">
