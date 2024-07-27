@@ -108,6 +108,8 @@ core.events.once('screen-source-select', async () => {
 		} catch (e) {
 			core.setToast('error', util.format('It looks like %s is not a valid World of Warcraft installation.', selector.value), null, -1);
 			log.write('Failed to initialize local CASC source: %s', e.message);
+			if (!BUILD_RELEASE)
+				console.error(e);
 
 			// In the event the given installation directory is now invalid, remove all
 			// recent local entries using that directory. If product was provided, we can
@@ -150,6 +152,8 @@ core.events.once('screen-source-select', async () => {
 			} catch (e) {
 				core.setToast('error', util.format('There was an error connecting to Blizzard\'s %s CDN, try another region!', tag.toUpperCase()), null, -1);
 				log.write('Failed to initialize remote CASC source: %s', e.message);
+				if (!BUILD_RELEASE)
+					console.error(e);
 			}
 		});
 	});

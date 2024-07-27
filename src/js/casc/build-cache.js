@@ -131,7 +131,8 @@ class BuildCache {
 		cacheIntegrity[filePath] = hash;
 
 		await fsp.writeFile(filePath, data.raw);
-		core.view.cacheSize += data.byteLength;
+		if (core.view != null)
+			core.view.cacheSize += data.byteLength;
 
 		await this.saveCacheIntegrity();
 	}

@@ -81,7 +81,7 @@ const ExportHelper = require('./js/casc/export-helper');
 const ExternalLinks = require('./js/external-links');
 const textureRibbon = require('./js/ui/texture-ribbon');
 
-const Listbox = require('./js/components/listbox');
+import Listbox from './js/components/listbox';
 const Listboxb = require('./js/components/listboxb');
 const Itemlistbox = require('./js/components/itemlistbox');
 const Checkboxlist = require('./js/components/checkboxlist');
@@ -91,7 +91,7 @@ const ComboBox = require('./js/components/combobox');
 const Slider = require('./js/components/slider');
 const ModelViewer = require('./js/components/model-viewer');
 const MapViewer = require('./js/components/map-viewer');
-const DataTable = require('./js/components/data-table');
+import DataTable from './js/components/data-table';
 const ResizeLayer = require('./js/components/resize-layer');
 const ContextMenu = require('./js/components/context-menu');
 
@@ -104,7 +104,7 @@ require('./js/ui/tab-text.js');
 require('./js/ui/tab-models');
 require('./js/ui/tab-maps');
 require('./js/ui/tab-items');
-const TabData = require('./js/ui/tab-data');
+import TabData from './js/ui/tab-data';
 require('./js/ui/tab-raw');
 require('./js/ui/tab-install');
 require('./js/ui/tab-characters');
@@ -561,7 +561,8 @@ document.addEventListener('click', function(e) {
 	});
 
 	// Interlink error handling for Vue.
-	app.config.errorHandler = err => crash('ERR_VUE', err.message);
+	if (BUILD_RELEASE)
+		app.config.errorHandler = err => crash('ERR_VUE', err.message);
 
 	app.component('Listbox', Listbox);
 	app.component('Listboxb', Listboxb);

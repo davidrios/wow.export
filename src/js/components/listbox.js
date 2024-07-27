@@ -16,7 +16,7 @@ const fid_filter = (e) => {
 	return e;
 };
 
-module.exports = {
+export default {
 	/**
 	 * items: Item entries displayed in the list.
 	 * filter: Optional reactive filter for items.

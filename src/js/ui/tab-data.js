@@ -3,15 +3,16 @@
 	Authors: Kruithne <kruithne@gmail.com>, Marlamin <marlamin@marlamin.com>
 	License: MIT
  */
-const log = require('../log');
-const generics = require('../generics');
-const listfile = require('../casc/listfile');
-const WDCReader = require('../db/WDCReader');
+
+const log = require('src/js/log');
+const generics = require('src/js/generics');
+const listfile = require('src/js/casc/listfile');
+const WDCReader = require('src/js/db/WDCReader');
 const path = require('path');
 
 const { inject, ref } = Vue;
 
-module.exports = {
+export default {
 	setup() {
 		const view = inject('view');
 

@@ -28,7 +28,7 @@ if (typeof chrome.runtime === 'undefined') {
 		async function () {
 			const clientStream = Readable.from(mainWindow, { objectMode: true });
 			for await (const message of msgpack.decodeMultiStream(clientStream)) {
-				console.log('received from main-window:', message);
+				// console.log('received from main-window:', message);
 
 				switch (message.type) {
 					case 'nw.App':
@@ -60,7 +60,7 @@ if (typeof chrome.runtime === 'undefined') {
 
 	const origRequire = require;
 	require = (id) => {
-		if (id[0] === '.')
+		if (id.startsWith('.'))
 			id = path.join('src', id);
 
 		return origRequire(id);
@@ -71,7 +71,7 @@ if (typeof chrome.runtime === 'undefined') {
 		if (!url.startsWith('http'))
 			return await origFetch(url, init);
 
-		console.log('fetch', url, init);
+		// console.log('fetch', url, init);
 		const id = ++fetchId;
 		const promise = new Promise((resolve) => fetchResolve[id] = resolve);
 		mainWindow.write(msgpack.encode({
@@ -81,7 +81,7 @@ if (typeof chrome.runtime === 'undefined') {
 		if (result.error != null)
 			throw new Error(result.error);
 
-		console.log('fetch res', result.response);
+		// console.log('fetch res', result.response);
 		async function text() {
 			const promise = new Promise((resolve) => fetchResolve[id] = resolve);
 			mainWindow.write(msgpack.encode({
@@ -91,7 +91,7 @@ if (typeof chrome.runtime === 'undefined') {
 			if (result.error != null)
 				throw new Error(result.error);
 
-			console.log('got path', result.path);
+			// console.log('got path', result.path);
 			return await fsp.readFile(result.path, 'utf8');
 		}
 		return {

@@ -42,10 +42,40 @@ const appScss = './src/app.scss';
 		});
 	});
 
+	const vueHmr = {
+		name: 'vue-hmr',
+		transform(code, id) {
+			if (!(
+				id.match(/\/src\/js\/.+\.js$/) &&
+				code.includes('export default') &&
+				code.includes('template: `') &&
+				!code.includes('import.meta.hot')
+			))
+				return;
+
+			const idj = JSON.stringify(id);
+			code = code.replace('template: `', '__hmrId: ' + idj + ', template: `');
+			code += `
+if (import.meta.hot) {
+	import.meta.hot.accept((newModule) => {
+		if (newModule == null)
+			return;
+
+		if (typeof __VUE_HMR_RUNTIME__ !== 'undefined')
+			__VUE_HMR_RUNTIME__.reload(${idj}, newModule.default);
+	});
+}`
+			console.log('vue-hmr', id);
+
+			return code;
+		},
+	}
+
 	const viteServer = await createServer({
 		configFile: false,
 		root: path.join(__dirname, 'src'),
-		server: { port: 4175 }
+		server: { port: 4175 },
+		plugins: [vueHmr]
 	})
 	viteServer.listen();
 
