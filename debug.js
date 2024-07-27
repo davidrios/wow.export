@@ -61,8 +61,7 @@ if (import.meta.hot) {
 		if (newModule == null)
 			return;
 
-		if (typeof __VUE_HMR_RUNTIME__ !== 'undefined')
-			__VUE_HMR_RUNTIME__.reload(${id}, newModule.default);
+		__VUE_HMR_RUNTIME__.reload(${id}, newModule.default);
 	});
 }`, { parser });
 
