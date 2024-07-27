@@ -5,7 +5,10 @@ const childProcess = require('child_process');
 const waitOn = require('wait-on');
 const { createServer } = require('vite');
 
-const nwPath = './bin/win-x64-debug/nw.exe';
+const argv = process.argv.splice(2);
+const isHmr = argv[0] === 'hmr';
+
+const nwPath = `./bin/win-x64-debug${isHmr ? '-hmr' : ''}/nw.exe`;
 const srcDir = './src/';
 const appScss = './src/app.scss';
 
@@ -71,18 +74,20 @@ if (import.meta.hot) {
 		},
 	}
 
-	const viteServer = await createServer({
-		configFile: false,
-		root: path.join(__dirname, 'src'),
-		server: { port: 4175 },
-		plugins: [vueHmr]
-	})
-	viteServer.listen();
+	if (isHmr) {
+		const viteServer = await createServer({
+			configFile: false,
+			root: path.join(__dirname, 'src'),
+			server: { port: 4175 },
+			plugins: [vueHmr]
+		})
+		viteServer.listen();
 
-	await waitOn({
-		resources: ['http-get://localhost:4175'],
-		headers: { 'accept': 'text/html' },
-	});
+		await waitOn({
+			resources: ['http-get://localhost:4175'],
+			headers: { 'accept': 'text/html' },
+		});
+	}
 
 	// Launch nw.exe
 	const nwProcess = childProcess.spawn(nwPath, { stdio: 'inherit' });

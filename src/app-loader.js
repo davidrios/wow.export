@@ -1,4 +1,4 @@
 (async function () {
 	await mainWindow.isReady;
-	await import('/app.js');
+	await import('./app.js');
 })();
