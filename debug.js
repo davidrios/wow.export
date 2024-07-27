@@ -3,14 +3,74 @@ const path = require('path');
 const sass = require('sass');
 const childProcess = require('child_process');
 const waitOn = require('wait-on');
-const { createServer } = require('vite');
+const vite = require('vite');
+const recast = require('recast');
+const parser = require('recast/parsers/babel');
 
 const argv = process.argv.splice(2);
 const isHmr = argv[0] === 'hmr';
+const vitePort = isHmr ? argv[1] ?? 4175 : null;
 
 const nwPath = `./bin/win-x64-debug${isHmr ? '-hmr' : ''}/nw.exe`;
 const srcDir = './src/';
 const appScss = './src/app.scss';
+
+function adjustRequireSrc(sourcePath) {
+	const node = sourcePath.node;
+	if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
+		const [arg] = node.arguments;
+		if (arg.type === 'StringLiteral' && arg.value.startsWith('.')) {
+			const newRequire = path.join('src', arg.value).replace(/\\/g, '/');
+			arg.value = newRequire;
+		}
+	}
+	this.traverse(sourcePath);
+}
+
+function addVueHmrId(ast, id) {
+	id = JSON.stringify(id);
+	let hasAdded = false;
+
+	recast.types.visit(ast, {
+		visitExportDefaultDeclaration(sourcePath) {
+			const node = sourcePath.node;
+			if (node.declaration.type === 'ObjectExpression' &&
+					// detect vue component by default export with `template` and (`setup` or `data`) properties
+					node.declaration.properties.filter(
+						prop => (
+							prop.key.type === 'Identifier' && (
+								prop.key.name === 'template' ||
+								prop.key.name === 'setup' ||
+								prop.key.name === 'data'
+							)
+						)
+					).length >= 2
+			) {
+				const hmrIdAst = recast.parse(`!{__hmrId: ${id}}`);
+				node.declaration.properties.push(...hmrIdAst.program.body[0].expression.argument.properties);
+				hasAdded = true;
+			}
+			this.traverse(sourcePath);
+		}
+	});
+
+	if (hasAdded) {
+		const astHot = recast.parse(`
+if (import.meta.hot) {
+	import.meta.hot.accept((newModule) => {
+		if (newModule == null)
+			return;
+
+		if (typeof __VUE_HMR_RUNTIME__ !== 'undefined')
+			__VUE_HMR_RUNTIME__.reload(${id}, newModule.default);
+	});
+}`, { parser });
+
+		ast.program.body.push(...astHot.program.body);
+	}
+
+	return hasAdded;
+}
 
 (async () => {
 	// Check if nw.exe exists
@@ -47,50 +107,41 @@ const appScss = './src/app.scss';
 
 	const vueHmr = {
 		name: 'vue-hmr',
-		transform(code, id) {
-			if (!(
-				id.match(/\/src\/js\/.+\.js$/) &&
-				code.includes('export default') &&
-				code.includes('template: `') &&
-				!code.includes('import.meta.hot')
-			))
+		async transform(code, id) {
+			const relativeId = id.substring(path.resolve(__dirname).length);
+			const isModule = relativeId.endsWith('.mjs');
+
+			if (!(relativeId.startsWith('/src') && (isModule || relativeId === '/src/init.js')))
 				return;
 
-			const idj = JSON.stringify(id);
-			code = code.replace('template: `', '__hmrId: ' + idj + ', template: `');
-			code += `
-if (import.meta.hot) {
-	import.meta.hot.accept((newModule) => {
-		if (newModule == null)
-			return;
+			const ast = recast.parse(code, { sourceFileName: id, parser });
+			recast.types.visit(ast, { visitCallExpression: adjustRequireSrc });
 
-		if (typeof __VUE_HMR_RUNTIME__ !== 'undefined')
-			__VUE_HMR_RUNTIME__.reload(${idj}, newModule.default);
-	});
-}`
-			console.log('vue-hmr', id);
+			if (isModule && !code.includes('import.meta.hot') && addVueHmrId(ast, relativeId))
+				console.log('vue-hmr:', relativeId);
 
-			return code;
+			return recast.print(ast, { sourceMapName: id });
 		},
 	}
 
 	if (isHmr) {
-		const viteServer = await createServer({
+		const viteServer = await vite.createServer({
 			configFile: false,
-			root: path.join(__dirname, 'src'),
-			server: { port: 4175 },
-			plugins: [vueHmr]
+			root: path.join(__dirname, srcDir),
+			server: { port: vitePort },
+			plugins: [vueHmr],
+			sourcemap: true,
 		})
 		viteServer.listen();
 
 		await waitOn({
-			resources: ['http-get://localhost:4175'],
+			resources: [`http-get://localhost:${vitePort}`],
 			headers: { 'accept': 'text/html' },
 		});
 	}
 
 	// Launch nw.exe
-	const nwProcess = childProcess.spawn(nwPath, { stdio: 'inherit' });
+	const nwProcess = childProcess.spawn(nwPath, { stdio: 'inherit', env: {...process.env, VITE_PORT: vitePort} });
 
 	// When the spawned process is closed, exit the Node.js process as well
 	nwProcess.on('close', code => {

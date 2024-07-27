@@ -6,18 +6,16 @@ const fsp = fs.promises;
 const { Readable } = require('stream');
 const msgpack = require('@msgpack/msgpack');
 
+let resolveMainWindow = null;
+
 let fetchId = 0;
 const fetchResolve = {};
-
-let resolveMainWindow = null;
 
 mainWindow = net.connect(
 	path.join('\\\\?\\pipe', process.cwd(), 'main-window'),
 	async function () {
 		const clientStream = Readable.from(mainWindow, { objectMode: true });
 		for await (const message of msgpack.decodeMultiStream(clientStream)) {
-			// console.log('received from main-window:', message);
-
 			switch (message.type) {
 				case 'nw.App':
 					nw.App = message.value;
@@ -54,9 +52,7 @@ fetch = async function (url, init) {
 	// console.log('fetch', url, init);
 	const id = ++fetchId;
 	const promise = new Promise((resolve) => fetchResolve[id] = resolve);
-	mainWindow.write(msgpack.encode({
-		type: "fetch", url, init, id
-	}));
+	mainWindow.write(msgpack.encode({ type: "fetch", url, init, id }));
 	const result = await promise;
 	if (result.error != null)
 		throw new Error(result.error);
@@ -64,9 +60,7 @@ fetch = async function (url, init) {
 	// console.log('fetch res', result.response);
 	async function text() {
 		const promise = new Promise((resolve) => fetchResolve[id] = resolve);
-		mainWindow.write(msgpack.encode({
-			type: "fetchText", id
-		}));
+		mainWindow.write(msgpack.encode({ type: "fetchText", id }));
 		const result = await promise;
 		if (result.error != null)
 			throw new Error(result.error);
@@ -74,6 +68,7 @@ fetch = async function (url, init) {
 		// console.log('got path', result.path);
 		return await fsp.readFile(result.path, 'utf8');
 	}
+
 	return {
 		...result.response,
 		text,

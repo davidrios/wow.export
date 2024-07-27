@@ -10,16 +10,7 @@
 // BUILD_RELEASE is set to false will be removed as dead-code during compile.
 BUILD_RELEASE = typeof BUILD_RELEASE !== 'undefined';
 
-const path = require('path');
-
 if (typeof chrome.runtime === 'undefined') {
-	const origRequire = require;
-	// eslint-disable-next-line no-global-assign
-	require = (id) => {
-		if (id.startsWith('.'))
-			id = path.join('src', id);
-		return origRequire(id);
-	}
 	require('./js/init-hmr');
 } else {
 	const win = nw.Window.get();

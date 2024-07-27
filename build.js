@@ -22,6 +22,8 @@ const uuid = require('uuid/v4');
 const crypto = require('crypto');
 const argv = process.argv.splice(2);
 const pkg = require('pkg');
+const fse = require('fs-extra');
+const { rollup } = require('rollup');
 
 const CONFIG_FILE = './build.conf';
 const MANIFEST_FILE = './package.json';
@@ -198,6 +200,25 @@ const collectFiles = async (dir, out = []) => {
 
 	return out;
 };
+
+async function removeFilesByExtension(directoryPath, targetExtension) {
+	try {
+		const entries = await fsp.readdir(directoryPath, { withFileTypes: true });
+
+		for (const entry of entries) {
+			const fullPath = path.join(directoryPath, entry.name);
+			if (entry.isDirectory()) {
+				await removeFilesByExtension(fullPath, targetExtension);
+			} else {
+				const ext = path.extname(entry.name);
+				if (ext.toLowerCase() === targetExtension.toLowerCase())
+					await fsp.unlink(fullPath);
+			}
+		}
+	} catch (err) {
+		console.error(`Error processing directory: ${err}`);
+	}
+}
 
 /**
  * Check if an AST node matches a structure.
@@ -544,7 +565,21 @@ const deflateBuffer = util.promisify(zlib.deflate);
 		} else if (isBundle) {
 			// Bundle everything together, packaged for production release.
 			const bundleConfig = build.bundleConfig;
-			const jsEntry = path.join(sourceDirectory, bundleConfig.jsEntry);
+
+			const preBuildDir = path.join(outDir, '_prebuild');
+			await fsp.rm(preBuildDir, { recursive: true, force: true });
+			await createDirectory(preBuildDir);
+			await fse.copy(sourceDirectory, preBuildDir, { overwrite: true });
+			const appLoader = 'app-loader.js';
+			const rollupBundle = await rollup({input: path.join(sourceDirectory, appLoader)});
+			await rollupBundle.write({
+				file: path.join(preBuildDir, appLoader),
+				format: 'cjs',
+				inlineDynamicImports: true,
+			});
+			removeFilesByExtension(preBuildDir, '.mjs');
+
+			const jsEntry = path.join(preBuildDir, bundleConfig.jsEntry);
 			log.info('Bundling sources (entry: *%s*)...', jsEntry);
 
 			// Make sure the source directory exists.

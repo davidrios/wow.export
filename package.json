@@ -36,6 +36,9 @@
 		"@msgpack/msgpack": "^2.8.0",
 		"eslint": "^6.8.0",
 		"eslint-plugin-vue": "^6.1.2",
+		"fs-extra": "^11.2.0",
+		"recast": "^0.23.9",
+		"rollup": "^4.19.1",
 		"vite": "^5.3.5",
 		"wait-on": "^7.2.0"
 	}

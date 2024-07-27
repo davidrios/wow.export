@@ -96,6 +96,12 @@ mainWindow.on('connection', async (socket) => {
 	}
 })
 
+const webview = document.createElement('webview');
+webview.src = `http://localhost:${process.env.VITE_PORT ?? 4175}`;
+webview.allownw = true;
+webview.partition = 'trusted';
+document.body.appendChild(webview);
+
 setTimeout(() => {
 	document.querySelector('webview').showDevTools(true);
 }, 100);
