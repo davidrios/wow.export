@@ -15,16 +15,20 @@ const nwPath = `./bin/win-x64-debug${isHmr ? '-hmr' : ''}/nw.exe`;
 const srcDir = './src/';
 const appScss = './src/app.scss';
 
-function adjustRequireSrc(sourcePath) {
-	const node = sourcePath.node;
-	if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
-		const [arg] = node.arguments;
-		if (arg.type === 'StringLiteral' && arg.value.startsWith('.')) {
-			const newRequire = path.join('src', arg.value).replace(/\\/g, '/');
-			arg.value = newRequire;
+function adjustRequireSrc(ast, id) {
+	recast.types.visit(ast, {
+		visitCallExpression(sourcePath) {
+			const node = sourcePath.node;
+			if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
+				const [arg] = node.arguments;
+				if (arg.type === 'StringLiteral' && arg.value.startsWith('.'))
+					arg.value = path.join(path.dirname(id), arg.value).substring(1).replace(/\\/g, '/');
+				else if (arg.type === 'StringLiteral' && arg.value.startsWith('/'))
+					arg.value = path.join('src', arg.value.substring(1)).replace(/\\/g, '/');
+			}
+			this.traverse(sourcePath);
 		}
-	}
-	this.traverse(sourcePath);
+	});
 }
 
 function addVueHmrId(ast, id) {
@@ -120,7 +124,7 @@ if (import.meta.hot) {
 				return;
 
 			const ast = recast.parse(code, { sourceFileName: id, parser });
-			recast.types.visit(ast, { visitCallExpression: adjustRequireSrc });
+			adjustRequireSrc(ast, relativeId);
 
 			if (isModule && !code.includes('import.meta.hot') && addVueHmrId(ast, relativeId))
 				console.log('vue-hmr:', relativeId);

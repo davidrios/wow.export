@@ -4,10 +4,10 @@
 	License: MIT
  */
 
-const log = require('./js/log');
-const generics = require('./js/generics');
-const listfile = require('./js/casc/listfile');
-const WDCReader = require('./js/db/WDCReader');
+const log = require('/js/log');
+const generics = require('/js/generics');
+const listfile = require('/js/casc/listfile');
+const WDCReader = require('/js/db/WDCReader');
 const path = require('path');
 
 const { inject, ref } = Vue;
