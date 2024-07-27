@@ -2,9 +2,9 @@ BUILD_RELEASE = false;
 
 const net = require('node:net');
 const path = require('path');
+const fsp = require('fs').promises;
 const { Readable } = require('stream');
 const msgpack = require('@msgpack/msgpack');
-const BufferWrapper = require('./js/buffer');
 const BuildCache = require('./js/casc/build-cache');
 
 const win = nw.Window.get();
@@ -45,9 +45,10 @@ async function processFetchText(id) {
 		}
 
 		const text = await fetches[id].text();
-		cache.storeFile(id, BufferWrapper.from(text));
+		const dest = cache.getFilePath(id);
+		await fsp.writeFile(dest, text, { flush: true });
 		delete fetches[id];
-		return {path: cache.getFilePath(id)};
+		return {path: dest};
 	} catch (e) {
 		console.error(e);
 		return {error: e.toString()};
