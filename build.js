@@ -570,10 +570,9 @@ const deflateBuffer = util.promisify(zlib.deflate);
 			await fsp.rm(preBuildDir, { recursive: true, force: true });
 			await createDirectory(preBuildDir);
 			await fse.copy(sourceDirectory, preBuildDir, { overwrite: true });
-			const appLoader = 'app-loader.js';
-			const rollupBundle = await rollup({input: path.join(sourceDirectory, appLoader)});
+			const rollupBundle = await rollup({input: path.join(sourceDirectory, bundleConfig.jsEntry.replace('.js', '.mjs'))});
 			await rollupBundle.write({
-				file: path.join(preBuildDir, appLoader),
+				file: path.join(preBuildDir, bundleConfig.jsEntry),
 				format: 'cjs',
 				inlineDynamicImports: true,
 			});
@@ -642,6 +641,10 @@ const deflateBuffer = util.promisify(zlib.deflate);
 			
 			await fsp.writeFile(path.join(sourceTarget, bundleConfig.jsEntry), minified.code, 'utf8');
 			log.success('*%d* sources bundled *%s* -> *%s* (*%d%*)', moduleTree.length, filesize(rawSize), filesize(minified.code.length), 100 - Math.round((minified.code.length / rawSize) * 100));
+
+			const initModule = await fsp.readFile(path.join(sourceDirectory, 'init.js'), 'utf8');
+			const minifiedInit = await terser.minify(initModule, config.terserConfig);
+			await fsp.writeFile(path.join(sourceTarget, 'init.js'), minifiedInit.code, 'utf8');
 
 			// Compile SCSS files into a single minified CSS output.
 			const sassEntry = path.join(sourceDirectory, bundleConfig.sassEntry);

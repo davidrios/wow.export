@@ -10,7 +10,7 @@
 // BUILD_RELEASE is set to false will be removed as dead-code during compile.
 BUILD_RELEASE = typeof BUILD_RELEASE !== 'undefined';
 
-if (typeof chrome.runtime === 'undefined') {
+if (!BUILD_RELEASE && typeof chrome.runtime === 'undefined') {
 	require('./js/init-hmr');
 } else {
 	const win = nw.Window.get();

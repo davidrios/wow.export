@@ -107,6 +107,12 @@ if (import.meta.hot) {
 
 	const vueHmr = {
 		name: 'vue-hmr',
+		async transformIndexHtml(html) {
+			return html.replace(
+				'<script defer type="text/javascript" src="app.js"></script>',
+				'<script type="module" src="app-loader.js"></script>'
+			);
+		},
 		async transform(code, id) {
 			const relativeId = id.substring(path.resolve(__dirname).length);
 			const isModule = relativeId.endsWith('.mjs');
