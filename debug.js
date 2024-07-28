@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const sass = require('sass');
 const childProcess = require('child_process');
+const net = require('net');
 const waitOn = require('wait-on');
 const vite = require('vite');
 const recast = require('recast');
@@ -207,8 +208,17 @@ if (import.meta.hot) {
 		});
 	}
 
+	const debugSocketPath = path.join('\\\\?\\pipe', nwPath, 'debug-window');
+	let debugSocket;
+	const debugServer = net.createServer().listen(debugSocketPath);
+	debugServer.on('connection', async (socket) => { debugSocket = socket; });
+	process.on('SIGINT', async function () {
+		debugSocket?.write('please_exit');
+		setTimeout(process.exit, 500);
+	});
+
 	// Launch nw.exe
-	const nwProcess = childProcess.spawn(nwPath, { stdio: 'inherit', env: { ...process.env, VITE_PORT: vitePort } });
+	const nwProcess = childProcess.spawn(nwPath, { stdio: 'inherit', env: { ...process.env, DEBUG_SOCKET: debugSocketPath, VITE_PORT: vitePort } });
 
 	// When the spawned process is closed, exit the Node.js process as well
 	nwProcess.on('close', code => {

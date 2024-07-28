@@ -7,6 +7,13 @@ const { Readable } = require('stream');
 const msgpack = require('@msgpack/msgpack');
 const BuildCache = require('./js/casc/build-cache');
 
+try {
+	const debugSocket = net.connect(process.env.DEBUG_SOCKET);
+	debugSocket.on('data', (data) => { if (data.toString() === 'please_exit') process.exit(); })
+} catch {
+	console.log('couldnt get debug socket');
+}
+
 const win = nw.Window.get();
 win.setProgressBar(-1); // Reset taskbar progress in-case it's stuck.
 win.on('close', () => process.exit()); // Ensure we exit when window is closed.
