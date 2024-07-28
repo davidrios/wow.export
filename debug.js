@@ -15,64 +15,120 @@ const nwPath = `./bin/win-x64-debug${isHmr ? '-hmr' : ''}/nw.exe`;
 const srcDir = './src/';
 const appScss = './src/app.scss';
 
+function convertModuleImport(moduleImport, relativeBase) {
+	if (moduleImport.startsWith('.'))
+		return path.join(path.dirname(relativeBase), moduleImport).substring(1).replace(/\\/g, '/');
+	else if (moduleImport.startsWith('/'))
+		return path.join('src', moduleImport.substring(1)).replace(/\\/g, '/');
+}
+
 function adjustRequireSrc(ast, id) {
 	recast.types.visit(ast, {
 		visitCallExpression(sourcePath) {
 			const node = sourcePath.node;
 			if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
 				const [arg] = node.arguments;
-				if (arg.type === 'StringLiteral' && arg.value.startsWith('.'))
-					arg.value = path.join(path.dirname(id), arg.value).substring(1).replace(/\\/g, '/');
-				else if (arg.type === 'StringLiteral' && arg.value.startsWith('/'))
-					arg.value = path.join('src', arg.value.substring(1)).replace(/\\/g, '/');
+				if (arg.type === 'StringLiteral') {
+					const converted = convertModuleImport(arg.value, id);
+					if (converted != null)
+						arg.value = converted;
+				}
 			}
 			this.traverse(sourcePath);
 		}
 	});
 }
 
-function addVueHmrId(ast, id) {
-	id = JSON.stringify(id);
-	let hasAdded = false;
+function getVueComponent(ast) {
+	let retDecl = null;
 
 	recast.types.visit(ast, {
-		visitExportDefaultDeclaration(sourcePath) {
-			const node = sourcePath.node;
-			if (node.declaration.type === 'ObjectExpression' &&
-					// detect vue component by default export with `template` and (`setup` or `data`) properties
-					node.declaration.properties.filter(
-						prop => (
-							prop.key.type === 'Identifier' && (
-								prop.key.name === 'template' ||
-								prop.key.name === 'setup' ||
-								prop.key.name === 'data'
-							)
-						)
-					).length >= 2
-			) {
-				const hmrIdAst = recast.parse(`!{__hmrId: ${id}}`);
-				node.declaration.properties.push(...hmrIdAst.program.body[0].expression.argument.properties);
-				hasAdded = true;
+		visitObjectExpression(sourcePath) {
+			const decl = sourcePath.value;
+
+			// detect vue component by default export with `template` and (`setup` or `data`) properties
+			let hasTemplate = false;
+			let hasSetupData = false;
+			for (const prop of decl.properties) {
+				if (prop.key.type !== 'Identifier')
+					continue;
+
+				hasTemplate = hasTemplate || prop.key.name === 'template';
+				hasSetupData = hasSetupData || prop.key.name === 'setup' || prop.key.name === 'data';
 			}
+
+			if (hasTemplate && hasSetupData) {
+				retDecl = decl;
+				return false;
+			}
+
 			this.traverse(sourcePath);
 		}
 	});
 
-	if (hasAdded) {
+	return retDecl;
+}
+
+function addVueHmr(ast, id) {
+	let components = new Set();
+	const b = recast.types.builders;
+
+	const variableDeclarations = Object.fromEntries(
+		ast.program.body
+			.filter(node => node.type === 'VariableDeclaration')
+			.map(node => [node.declarations[0].id.name, node])
+	);
+
+	for (let i = 0; i < ast.program.body.length; i++) {
+		const node = ast.program.body[i];
+		if (!node.type.startsWith('Export'))
+			continue;
+
+		try {
+			let vueComponent = getVueComponent(node);
+			if (vueComponent == null) {
+				const variableName = node.declaration.name ?? (node.declaration.declarations ?? '')[0]?.init?.name;
+				const variable = variableDeclarations[variableName]
+				if (variableName == null || variable == null)
+					continue;
+
+				vueComponent = getVueComponent(variable);
+				if (vueComponent == null)
+					continue
+			}
+
+			const name = node.type === 'ExportDefaultDeclaration'
+				? 'default'
+				: node.declaration.declarations[0].id.name;
+
+			const componentId = `${id}:${name}`;
+			components.add([componentId, name]);
+
+			vueComponent.properties.push(b.objectProperty(
+				b.identifier('__hmrId'),
+				b.stringLiteral(componentId)));
+		} catch (e) {
+			console.error(e);
+		}
+	}
+
+	if (components.size > 0) {
 		const astHot = recast.parse(`
 if (import.meta.hot) {
 	import.meta.hot.accept((newModule) => {
 		if (newModule == null)
 			return;
 
-		__VUE_HMR_RUNTIME__.reload(${id}, newModule.default);
+		${Array.from(components.values())
+		.map(([componentId, name]) => `__VUE_HMR_RUNTIME__.reload(${JSON.stringify(componentId)}, newModule.${name})`)
+		.join(';')};
 	});
 }`, { parser });
 
 		ast.program.body.push(...astHot.program.body);
-	}
 
-	return hasAdded;
+		return true;
+	}
 }
 
 (async () => {
@@ -126,8 +182,10 @@ if (import.meta.hot) {
 			const ast = recast.parse(code, { sourceFileName: id, parser });
 			adjustRequireSrc(ast, relativeId);
 
-			if (isModule && !code.includes('import.meta.hot') && addVueHmrId(ast, relativeId))
-				console.log('vue-hmr:', relativeId);
+			if (isModule && !code.includes('import.meta.hot')) {
+				if (addVueHmr(ast, relativeId))
+					console.log('vue-hmr:', relativeId);
+			}
 
 			return recast.print(ast, { sourceMapName: id });
 		},
@@ -150,7 +208,7 @@ if (import.meta.hot) {
 	}
 
 	// Launch nw.exe
-	const nwProcess = childProcess.spawn(nwPath, { stdio: 'inherit', env: {...process.env, VITE_PORT: vitePort} });
+	const nwProcess = childProcess.spawn(nwPath, { stdio: 'inherit', env: { ...process.env, VITE_PORT: vitePort } });
 
 	// When the spawned process is closed, exit the Node.js process as well
 	nwProcess.on('close', code => {
