@@ -16,6 +16,7 @@ const listfile = require('/js/casc/listfile');
 // They're in different modules so they only need to reload if the module changes
 import loadData from './characters/game-data.mjs';
 import loadRendering from './characters/rendering.mjs';
+import loadUiState from './characters/ui-state.mjs';
 import TextureOverlay from './characters/texture-overlay.mjs';
 
 const { inject, ref, watch, onBeforeUnmount } = Vue;
@@ -28,11 +29,31 @@ export default {
 		const view = inject('view');
 
 		const isLoaded = ref(false);
-		const chrModelViewerContext = ref();
-		const chrImportRegions = ref([]);
-		const chrImportRealms = ref([]);
 
-		const chrImportSelectedRegion = ref('');
+		const uiState = loadUiState();
+		const {
+			chrModelViewerContext,
+			chrCustRaces,
+			chrCustRaceSelection,
+			chrCustModels,
+			chrCustModelSelection,
+			chrCustOptions,
+			chrCustOptionSelection,
+			chrCustChoices,
+			chrCustChoiceSelection,
+			chrCustActiveChoices,
+			chrCustGeosets,
+			chrCustUnsupportedWarning,
+			chrImportChrName,
+			chrImportRegions,
+			chrImportRealms,
+			chrImportSelectedRegion,
+			chrImportSelectedRealm,
+			chrImportLoadVisage,
+			chrImportChrModelID,
+			chrImportChoices,
+		} = uiState;
+
 		watch(chrImportSelectedRegion, () => {
 			const realmList = view.realmList[chrImportSelectedRegion.value].map(realm => ({ label: realm.name, value: realm.slug }));
 			chrImportRealms.value = realmList;
@@ -70,7 +91,6 @@ export default {
 
 		const chrMaterials = ref(new Map());
 
-		//let textureShaderMap = new Map();
 		let currentCharComponentTextureLayoutID = 0;
 
 		async function resetMaterials() {
@@ -101,35 +121,15 @@ export default {
 			}
 		}
 
-		const chrCustRaces = ref([]); // Available character races to select from
-		const chrCustRaceSelection = ref([]); // Current race ID selected
-		const chrCustModels = ref([]); // Available character customization models.
-		const chrCustModelSelection = ref([]); // Selected character customization model.
-		const chrCustOptions = ref([]); // Available character customization options.
-		const chrCustOptionSelection = ref([]); // Selected character customization option.
-		const chrCustChoices = ref([]); // Available character customization choices.
-		const chrCustChoiceSelection = ref([]); // Selected character customization choice.
-		const chrCustActiveChoices = ref([]); // Active character customization choices.
-		const chrCustGeosets = ref([]); // Character customization model geoset control.
-		const chrCustTab = ref('models'); // Active tab for character customization.
-		const chrCustRightTab = ref('geosets'); // Active right tab for character customization.
-		const chrCustUnsupportedWarning = ref(false); // Display warning for unsupported character customizations.
-		const chrImportChrName = ref(''); // Character import, character name input.
-
-		const chrImportSelectedRealm = ref(null);
-		const chrImportLoadVisage = ref(false); // Whether or not to load the visage model instead (Dracthyr/Worgen)
-		const chrImportChrModelID = ref(0); // Temporary storage for target character model ID.
-		const chrImportChoices = ref([]); // Temporary storage for character import choices.
-
 		async function updateActiveCustomization() {
 			await resetMaterials();
 
 			const newSkinnedModels = new Map();
 
-			const selection = chrCustActiveChoices.value;
-			for (const activeChoice of selection) {
+			const allChoices = new Set(chrCustActiveChoices.value.values());
+			for (const [optionID, choiceID] of chrCustActiveChoices.value.entries()) {
 				// Update all geosets for this option.
-				const availableChoices = d.optionToChoices.get(activeChoice.optionID);
+				const availableChoices = d.optionToChoices.get(optionID);
 
 				for (const availableChoice of availableChoices) {
 					const chrCustGeoID = d.choiceToGeoset.get(availableChoice.id);
@@ -142,7 +142,7 @@ export default {
 								continue;
 
 							if (availableGeoset.id === geoset) {
-								let shouldBeChecked = availableChoice.id == activeChoice.choiceID;
+								let shouldBeChecked = availableChoice.id == choiceID;
 								if (availableGeoset.checked != shouldBeChecked)
 									availableGeoset.checked = shouldBeChecked;
 							}
@@ -151,12 +151,12 @@ export default {
 				}
 
 				// Update material (if applicable)
-				const chrCustMatIDs = d.choiceToChrCustMaterialID.get(activeChoice.choiceID);
+				const chrCustMatIDs = d.choiceToChrCustMaterialID.get(choiceID);
 
 				if (chrCustMatIDs != undefined) {
 					for (const chrCustMatID of chrCustMatIDs) {
 						if (chrCustMatID.RelatedChrCustomizationChoiceID != 0) {
-							const hasRelatedChoice = selection.find((selectedChoice) => selectedChoice.choiceID === chrCustMatID.RelatedChrCustomizationChoiceID);
+							const hasRelatedChoice = allChoices.has(chrCustMatID.RelatedChrCustomizationChoiceID);
 							if (!hasRelatedChoice)
 								continue;
 						}
@@ -608,7 +608,7 @@ export default {
 			exportPaths?.close();
 		};
 
-		async function updateModelSelection() {
+		async function updateModelSelection(isChanged) {
 			const selected = chrCustModelSelection.value[0];
 			if (selected === undefined)
 				return;
@@ -621,19 +621,11 @@ export default {
 				return;
 			}
 
-			// Empty the arrays.
-			chrCustOptions.value = [];
-			chrCustOptionSelection.value = [];
-
-			// Reset active choices
-			chrCustActiveChoices.value = [];
-
-			if (chrImportChoices.value.length > 0)
-				chrCustActiveChoices.value.push(...chrImportChoices.value);
-
-			// Add the new options.
-			chrCustOptions.value.push(...availableOptions);
-			chrCustOptionSelection.value.push(...availableOptions.slice(0, 1));
+			chrCustOptions.value = availableOptions.slice();
+			if (isChanged) {
+				chrCustOptionSelection.value = [availableOptions[0]];
+				chrCustActiveChoices.value.clear();
+			}
 
 			console.log("Set currentCharComponentTextureLayoutID to " + currentCharComponentTextureLayoutID);
 			currentCharComponentTextureLayoutID = d.chrModelIDToTextureLayoutID.get(selected.id);
@@ -646,16 +638,14 @@ export default {
 
 			clearMaterials();
 
-			if (chrImportChoices.value.length == 0) {
+			if (isChanged) {
 				// For each available option we select the first choice ONLY if the option is a 'default' option.
 				// TODO: What do we do if the user doesn't want to select any choice anymore? Are "none" choices guaranteed for these options?
 				for (const option of availableOptions) {
 					const choices = d.optionToChoices.get(option.id);
 					if (d.defaultOptions.includes(option.id))
-						chrCustActiveChoices.value.push({ optionID: option.id, choiceID: choices[0].id });
+						chrCustActiveChoices.value.set(option.id, choices[0].id);
 				}
-			} else {
-				chrImportChoices.value = [];
 			}
 		}
 
@@ -686,7 +676,7 @@ export default {
 			}
 
 			chrCustChoices.value = availableChoices.slice();
-			chrCustChoiceSelection.value = [];
+			chrCustChoiceSelection.value = [availableChoices.find(choice => chrCustActiveChoices.value.get(selected.id) === choice.id)];
 		}
 
 		async function updateCustomizationChoice() {
@@ -695,13 +685,12 @@ export default {
 				return;
 
 			const selected = selection[0];
+			if (selected == null)
+				return;
+
 			console.log('Choice selection for option ID ' + chrCustOptionSelection.value[0].id + ', label ' + chrCustOptionSelection.value[0].label + ' changed to choice ID ' + selected.id + ', label ' + selected.label);
-			if (chrCustActiveChoices.value.find((choice) => choice.optionID === chrCustOptionSelection.value[0].id) === undefined) {
-				chrCustActiveChoices.value.push({ optionID: chrCustOptionSelection.value[0].id, choiceID: selected.id });
-			} else {
-				const index = chrCustActiveChoices.value.findIndex((choice) => choice.optionID === chrCustOptionSelection.value[0].id);
-				chrCustActiveChoices.value[index].choiceID = selected.id;
-			}
+
+			chrCustActiveChoices.value.set(chrCustOptionSelection.value[0].id, selected.id);
 		}
 
 		// If NPC race toggle changes, refresh model list.
@@ -713,7 +702,9 @@ export default {
 		watch(chrCustRaceSelection, updateChrModelList);
 
 		// User has changed the "Body Type" selection, ie "Type 1", "Type 2", etc.
-		watch(chrCustModelSelection, updateModelSelection, { deep: true });
+		watch(chrCustModelSelection, (newVal, oldVal) => {
+			updateModelSelection(!(newVal[0] && newVal[0].id === oldVal[0]?.id));
+		}, { deep: true });
 
 		// User has changed the "Customization" selection, ie "Hair Color", "Skin Color", etc.
 		watch(chrCustOptionSelection, updateCustomizationType, { deep: true });
@@ -745,28 +736,7 @@ export default {
 			view,
 			config: view.config,
 			isLoaded,
-			chrModelViewerContext,
-			chrCustRaces,
-			chrCustRaceSelection,
-			chrCustModels,
-			chrCustModelSelection,
-			chrCustOptions,
-			chrCustOptionSelection,
-			chrCustChoices,
-			chrCustChoiceSelection,
-			chrCustActiveChoices,
-			chrCustGeosets,
-			chrCustTab,
-			chrCustRightTab,
-			chrCustUnsupportedWarning,
-			chrImportChrName,
-			chrImportRegions,
-			chrImportSelectedRegion,
-			chrImportRealms,
-			chrImportSelectedRealm,
-			chrImportLoadVisage,
-			chrImportChrModelID,
-			chrImportChoices,
+			...uiState,
 			chrMaterials,
 			importCharacter,
 			exportCharModel,
