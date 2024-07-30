@@ -21,7 +21,7 @@ class M2Renderer {
 	 * Construct a new M2Renderer instance.
 	 * @param {BufferWrapper} data 
 	 * @param {THREE.Group} renderGroup
-	 * @param {boolean} [reactive=false]
+	 * @param {boolean | Ref} [reactive=false]
 	 * @param {boolean} [useRibbon=true]
 	 */
 	constructor(data, renderGroup, reactive = false, useRibbon = true) {
@@ -51,7 +51,10 @@ class M2Renderer {
 			await this.loadSkin(0);
 
 			if (this.reactive) {
-				this.geosetWatcher = core.view.$watch(this.geosetKey, () => this.updateGeosets(), { deep: true });
+				if (Vue.isRef(this.reactive))
+					this.geosetWatcher = Vue.watch(this.reactive, () => this.updateGeosets(), { deep: true });
+				else
+					this.geosetWatcher = core.view.$watch(this.geosetKey, () => this.updateGeosets(), { deep: true });
 				this.wireframeWatcher = core.view.$watch('config.modelViewerWireframe', () => this.updateWireframe(), { deep: true });
 			}
 		}
@@ -204,7 +207,10 @@ class M2Renderer {
 		}
 
 		if (this.reactive) {
-			core.view[this.geosetKey] = this.geosetArray;
+			if (Vue.isRef(this.reactive))
+				this.reactive.value = this.geosetArray.slice();
+			else
+				core.view[this.geosetKey] = this.geosetArray;
 			GeosetMapper.map(this.geosetArray);
 		}
 

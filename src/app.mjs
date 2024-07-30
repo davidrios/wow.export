@@ -107,7 +107,7 @@ require('./js/ui/tab-items');
 import TabData from './js/ui/tab-data.mjs';
 require('./js/ui/tab-raw');
 require('./js/ui/tab-install');
-require('./js/ui/tab-characters');
+import TabCharacters from './js/ui/tab-characters.mjs';
 
 const RCPServer = require('./js/rcp/rcp-server');
 
@@ -578,6 +578,7 @@ document.addEventListener('click', function(e) {
 	app.component('ResizeLayer', ResizeLayer);
 	app.component('ContextMenu', ContextMenu);
 	app.component('TabData', TabData);
+	app.component('TabCharacters', TabCharacters);
 	app.mount('#container');
 
 	// Log some basic information for potential diagnostics.
