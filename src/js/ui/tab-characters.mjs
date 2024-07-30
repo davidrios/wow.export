@@ -625,6 +625,13 @@ export default {
 			if (isChanged) {
 				chrCustOptionSelection.value = [availableOptions[0]];
 				chrCustActiveChoices.value.clear();
+			} else if (chrImportChoices.value.length > 0) {
+				chrCustActiveChoices.value.clear();
+				for (const {optionID, choiceID} of chrImportChoices.value)
+					chrCustActiveChoices.value.set(optionID, choiceID);
+
+				isChanged = true;
+				chrImportChoices.value = [];
 			}
 
 			console.log("Set currentCharComponentTextureLayoutID to " + currentCharComponentTextureLayoutID);
