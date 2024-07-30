@@ -16,10 +16,14 @@ const listfile = require('/js/casc/listfile');
 // They're in different modules so they only need to reload if the module changes
 import loadData from './characters/game-data.mjs';
 import loadRendering from './characters/rendering.mjs';
+import TextureOverlay from './characters/texture-overlay.mjs';
 
 const { inject, ref, watch, onBeforeUnmount } = Vue;
 
 export default {
+	components: {
+		TextureOverlay
+	},
 	setup() {
 		const view = inject('view');
 
@@ -64,13 +68,13 @@ export default {
 		const skinnedModelRenderers = new Map();
 		const skinnedModelMeshes = new Set();
 
-		const chrMaterials = new Map();
+		const chrMaterials = ref(new Map());
 
 		//let textureShaderMap = new Map();
 		let currentCharComponentTextureLayoutID = 0;
 
 		async function resetMaterials() {
-			for (const chrMaterial of chrMaterials.values()) {
+			for (const chrMaterial of chrMaterials.value.values()) {
 				await chrMaterial.reset();
 				await chrMaterial.update();
 			}
@@ -91,7 +95,7 @@ export default {
 		}
 
 		async function uploadRenderOverrideTextures() {
-			for (const [chrModelTextureTarget, chrMaterial] of chrMaterials) {
+			for (const [chrModelTextureTarget, chrMaterial] of chrMaterials.value) {
 				await chrMaterial.update();
 				await activeRenderer.overrideTextureTypeWithCanvas(chrModelTextureTarget,  chrMaterial.getCanvas());
 			}
@@ -175,13 +179,13 @@ export default {
 
 						let chrMaterial;
 
-						if (!chrMaterials.has(chrModelMaterial.TextureType)) {
+						if (!chrMaterials.value.has(chrModelMaterial.TextureType)) {
 							chrMaterial = new CharMaterialRenderer(chrModelMaterial.TextureType, chrModelMaterial.Width, chrModelMaterial.Height);
-							chrMaterials.set(chrModelMaterial.TextureType, chrMaterial);
+							chrMaterials.value.set(chrModelMaterial.TextureType, chrMaterial);
 
 							await chrMaterial.init();
 						} else {
-							chrMaterial = chrMaterials.get(chrModelMaterial.TextureType);
+							chrMaterial = chrMaterials.value.get(chrModelMaterial.TextureType);
 						}
 
 						// Find row in CharComponentTextureSection based on chrModelTextureLayer.TextureSectionTypeBitMask and current CharComponentTextureLayoutID
@@ -579,7 +583,7 @@ export default {
 				const exportPath = ExportHelper.replaceExtension(ExportHelper.getExportPath(fileName), ".gltf");
 				const exporter = new M2Exporter(data, [], fileDataID);
 
-				for (const [chrModelTextureTarget, chrMaterial] of chrMaterials)
+				for (const [chrModelTextureTarget, chrMaterial] of chrMaterials.value)
 					exporter.addURITexture(chrModelTextureTarget, chrMaterial.getURI());
 
 				// Respect geoset masking for selected model.
@@ -656,10 +660,10 @@ export default {
 		}
 
 		function clearMaterials() {
-			for (const chrMaterial of chrMaterials.values())
+			for (const chrMaterial of chrMaterials.value.values())
 				chrMaterial.dispose();
 
-			chrMaterials.clear();
+			chrMaterials.value.clear();
 		}
 
 		async function updateCustomizationType() {
@@ -731,7 +735,7 @@ export default {
 		window.reloadShaders = async () => {
 			await CharMaterialRenderer.init();
 
-			for (const material of chrMaterials.values())
+			for (const material of chrMaterials.value.values())
 				await material.compileShaders();
 
 			await uploadRenderOverrideTextures();
@@ -763,6 +767,7 @@ export default {
 			chrImportLoadVisage,
 			chrImportChrModelID,
 			chrImportChoices,
+			chrMaterials,
 			importCharacter,
 			exportCharModel,
 		};
@@ -797,12 +802,7 @@ export default {
 				<div class="preview-background">
 					<model-viewer :context="chrModelViewerContext"></model-viewer>
 				</div>
-				<div class="texture-preview-panel" id="chr-texture-preview" v-show="config.chrShowTextureOverlay">
-					<div id="chr-overlay-btn">
-						<input type="button" value="&gt;" @click="click('chr-next-overlay', $event)"/>
-						<input type="button" value="&lt;" @click="click('chr-prev-overlay', $event)"/>
-					</div>
-				</div>
+				<texture-overlay :materials="chrMaterials" v-if="config.chrShowTextureOverlay"></texture-overlay>
 			</div>
 			<div class="right-panel">
 				<div class="tab-control">

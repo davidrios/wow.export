@@ -10,7 +10,6 @@ const core = require('../../core');
 const log = require('../../log');
 const listfile = require('../../casc/listfile');
 const constants = require('../../constants');
-const overlay = require('../../ui/char-texture-overlay');
 
 const FRAG_SHADER_SRC = path.join(constants.SHADER_PATH, 'char.fragment.shader');
 const VERT_SHADER_SRC = path.join(constants.SHADER_PATH, 'char.vertex.shader');
@@ -41,8 +40,6 @@ class CharMaterialRenderer {
 
 		const canvas = document.createElement('canvas');
 		canvas.id = 'charMaterialCanvas-' + textureLayer;
-
-		overlay.add(canvas);
 
 		canvas.width = width;
 		canvas.height = height;
@@ -121,7 +118,6 @@ class CharMaterialRenderer {
 		}
 
 		this.clearCanvas();
-		overlay.remove(this.glCanvas);
 
 		this.gl.getExtension('WEBGL_lose_context').loseContext();
 		this.glCanvas = null;
