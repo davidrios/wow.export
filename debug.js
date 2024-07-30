@@ -25,8 +25,8 @@ function convertModuleImport(moduleImport, relativeBase) {
 
 function adjustRequireSrc(ast, id) {
 	recast.types.visit(ast, {
-		visitCallExpression(sourcePath) {
-			const node = sourcePath.node;
+		visitCallExpression(nodePath) {
+			const node = nodePath.node;
 			if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
 				const [arg] = node.arguments;
 				if (arg.type === 'StringLiteral') {
@@ -35,17 +35,18 @@ function adjustRequireSrc(ast, id) {
 						arg.value = converted;
 				}
 			}
-			this.traverse(sourcePath);
+			this.traverse(nodePath);
 		}
 	});
 }
 
 function getVueComponent(ast) {
 	let retDecl = null;
+	const b = recast.types.builders;
 
 	recast.types.visit(ast, {
-		visitObjectExpression(sourcePath) {
-			const decl = sourcePath.value;
+		visitObjectExpression(nodePath) {
+			const decl = nodePath.value;
 
 			// detect vue component by default export with `template` and (`setup` or `data`) properties
 			let hasTemplate = false;
@@ -56,6 +57,49 @@ function getVueComponent(ast) {
 
 				hasTemplate = hasTemplate || prop.key.name === 'template';
 				hasSetupData = hasSetupData || prop.key.name === 'setup' || prop.key.name === 'data';
+				if (prop.key.name === 'data') {
+					// wrap original data body in a try block to gracefully handle errors
+					recast.types.visit(prop, {
+						visitBlockStatement(subPath) {
+							if (
+								subPath.parentPath.value.type === 'ObjectMethod' ||
+								subPath.parentPath.value.type === 'FunctionExpression' ||
+								subPath.parentPath.value.type === 'ArrowFunctionExpression'
+							) {
+								subPath.node.body = [
+									b.tryStatement(
+										b.blockStatement([...subPath.node.body]),
+										b.catchClause(b.identifier('e'), null,
+											b.blockStatement([
+												b.expressionStatement(
+													b.callExpression(
+														b.memberExpression(b.identifier('console'), b.identifier('error')),
+														[b.stringLiteral('Vue component crashed,'), b.identifier('e')]
+													)
+												),
+												b.expressionStatement(
+													b.callExpression(
+														b.memberExpression(b.identifier('Vue'), b.identifier('onMounted')),
+														[b.arrowFunctionExpression([], b.blockStatement([
+															b.expressionStatement(b.assignmentExpression(
+																'=',
+																b.memberExpression(b.memberExpression(b.identifier('this'), b.identifier('$el')), b.identifier('innerHTML')),
+																b.stringLiteral(`<crashed-component style="flex-grow: 1"></crashed-component>`)
+															))
+														]))]
+													)
+												),
+												b.returnStatement(b.objectExpression([]))
+											]))
+									)
+								];
+
+								return false;
+							}
+							this.traverse(subPath);
+						}
+					});
+				}
 			}
 
 			if (hasTemplate && hasSetupData) {
@@ -63,7 +107,7 @@ function getVueComponent(ast) {
 				return false;
 			}
 
-			this.traverse(sourcePath);
+			this.traverse(nodePath);
 		}
 	});
 

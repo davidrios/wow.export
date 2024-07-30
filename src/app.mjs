@@ -561,8 +561,18 @@ document.addEventListener('click', function(e) {
 	});
 
 	// Interlink error handling for Vue.
-	if (BUILD_RELEASE)
+	if (BUILD_RELEASE) {
 		app.config.errorHandler = err => crash('ERR_VUE', err.message);
+	}
+	else {
+		await import('./js/components/crashed-component.mjs');
+		app.config.errorHandler = (err, vm, info) => {
+			console.error('Vue component crashed,', err, info);
+			Vue.nextTick(() => {
+				vm.$el.innerHTML = '<crashed-component style="flex-grow: 1"></crashed-component>';
+			});
+		};
+	}
 
 	app.component('Listbox', Listbox);
 	app.component('Listboxb', Listboxb);
