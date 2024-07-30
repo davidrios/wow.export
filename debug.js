@@ -55,7 +55,7 @@ function getVueComponent(ast) {
 				if (prop.key.type !== 'Identifier')
 					continue;
 
-				hasTemplate = hasTemplate || prop.key.name === 'template';
+				hasTemplate = hasTemplate || prop.key.name === 'template' || prop.key.name === 'render';
 				hasSetupData = hasSetupData || prop.key.name === 'setup' || prop.key.name === 'data';
 				if (prop.key.name === 'data') {
 					// wrap original data body in a try block to gracefully handle errors
@@ -90,6 +90,43 @@ function getVueComponent(ast) {
 													)
 												),
 												b.returnStatement(b.objectExpression([]))
+											]))
+									)
+								];
+
+								return false;
+							}
+							this.traverse(subPath);
+						}
+					});
+				}
+
+				if (prop.key.name === 'render') {
+					// wrap original render body in a try block to gracefully handle errors
+					recast.types.visit(prop, {
+						visitBlockStatement(subPath) {
+							if (
+								subPath.parentPath.value.type === 'ObjectMethod' ||
+								subPath.parentPath.value.type === 'FunctionExpression' ||
+								subPath.parentPath.value.type === 'ArrowFunctionExpression'
+							) {
+								subPath.node.body = [
+									b.tryStatement(
+										b.blockStatement([...subPath.node.body]),
+										b.catchClause(b.identifier('e'), null,
+											b.blockStatement([
+												b.expressionStatement(
+													b.callExpression(
+														b.memberExpression(b.identifier('console'), b.identifier('error')),
+														[b.stringLiteral('Vue component crashed,'), b.identifier('e')]
+													)
+												),
+												b.returnStatement(
+													b.callExpression(
+														b.memberExpression(b.identifier('Vue'), b.identifier('h')),
+														[b.stringLiteral('crashed-component')]
+													)
+												)
 											]))
 									)
 								];
@@ -158,11 +195,30 @@ function addVueHmr(ast, id) {
 	}
 
 	if (components.size > 0) {
+		const templateTests = [];
+		// eslint-disable-next-line no-unused-vars
+		for (const [_, name] of components.values()) {
+			templateTests.push(`
+if (newModule.${name}.template) {
+	const errors = [];
+	try {
+		Vue.compile(newModule.${name}.template, {onError(e) { errors.push(e); }});
+	} catch (e) { errors.push(e); }
+	if (errors.length > 0) {
+	  for (const e of errors)
+			console.error(${JSON.stringify(name)} + ": Vue template compilation errors,", e);
+		newModule.${name}.template = \`<crashed-component style="flex-grow: 1"></crashed-component>\`;
+	}
+}`);
+		}
+
 		const astHot = recast.parse(`
 if (import.meta.hot) {
 	import.meta.hot.accept((newModule) => {
 		if (newModule == null)
 			return;
+
+		${templateTests.join('\n')}
 
 		${Array.from(components.values())
 		.map(([componentId, name]) => `__VUE_HMR_RUNTIME__.reload(${JSON.stringify(componentId)}, newModule.${name})`)
