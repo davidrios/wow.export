@@ -85,7 +85,6 @@ export default {
 			activeRenderer?.dispose();
 			disposeSkinnedModels();
 		});
-		let isCameraUpdated = true;
 
 		const skinnedModelRenderers = new Map();
 		const skinnedModelMeshes = new Set();
@@ -413,10 +412,7 @@ export default {
 
 				await activeRenderer.load();
 				//textureShaderMap = activeRenderer.shaderMap;
-				if (!isCameraUpdated) {
-					updateCameraBounding();
-					isCameraUpdated = true;
-				}
+				updateCameraBounding();
 
 				activeModel = fileDataID;
 
@@ -613,8 +609,6 @@ export default {
 		};
 
 		async function updateModelSelection(isChanged) {
-			isCameraUpdated = !isChanged;
-
 			const selected = chrCustModelSelection.value[0];
 			if (selected === undefined)
 				return;
