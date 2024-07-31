@@ -271,7 +271,7 @@ if (import.meta.hot) {
 			return html.replace(
 				'<script defer type="text/javascript" src="app.js"></script>',
 				'<script type="module" src="app-loader.js"></script>'
-			);
+			).replace(/app\.css/g, 'app.scss');
 		},
 		async transform(code, id) {
 			const relativeId = id.substring(path.resolve(__dirname).length);
@@ -299,6 +299,7 @@ if (import.meta.hot) {
 			server: { port: vitePort },
 			plugins: [vueHmr],
 			sourcemap: true,
+			css: { devSourcemap: true }
 		})
 		viteServer.listen();
 
