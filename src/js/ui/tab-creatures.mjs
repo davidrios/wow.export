@@ -14,7 +14,6 @@ async function getCreatureByID(view, creatureId) {
 	const casc = view.casc;
 	const namespace = `${constants.WOWAPI_NAMESPACE[casc.build.Product]}-${casc.build.Branch}`;
 	const params = new URLSearchParams({
-		region: casc.build.Branch,
 		namespace,
 		locale: getLocale(view)
 	});
@@ -49,7 +48,6 @@ async function searchCreature(view, name, page=1) {
 	const locale = getLocale(view);
 	const locName = `name.${locale}`;
 	const params = new URLSearchParams({
-		region: casc.build.Branch,
 		namespace,
 		[locName]: name,
 		orderby: locName,
