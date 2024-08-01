@@ -19,6 +19,7 @@
 						<div class="option" id="nav-models" @click="setScreen('tab-models')" :class="{ active: screen === 'tab-models' }">Models</div>
 						<div class="option" id="nav-characters" @click="setScreen('tab-characters')" :class="{ active: screen === 'tab-characters' }">Characters</div>
 						<div class="option" id="nav-items" @click="setScreen('tab-items')" :class="{ active: screen === 'tab-items' }">Items</div>
+						<div class="option" id="nav-creatures" @click="setScreen('tab-creatures')" :class="{ active: screen === 'tab-creatures' }">Creatures</div>
 						<div class="option" id="nav-textures" @click="setScreen('tab-textures')" :class="{ active: screen === 'tab-textures' }">Textures</div>
 						<div class="option" id="nav-sounds" @click="setScreen('tab-sounds')" :class="{ active: screen === 'tab-sounds' }">Audio</div>
 						<div class="option" id="nav-videos" @click="setScreen('tab-video')" :class="{ active: screen === 'tab-video' }">Videos</div>
@@ -351,6 +352,12 @@
 						<p>Override the text file location which export manifest entries are written to.</p>
 						<input type="text" v-model.trim="configEdit.lastExportFile" :placeholder="lastExportPathDefault" class="long"/>
 					</div>
+					<div>
+						<h1>Battle.net API</h1>
+						<p>Credentials for official World of Warcraft API. Check <a href="https://develop.battle.net">https://develop.battle.net</a></p>
+						<input type="text" width="140" v-model.trim="configEdit.wowapiClientID" maxlength="32" placeholder="e.g 77d9048f49fc40f6b0400ac6f477c43c"/>
+						<input type="password" width="140" v-model.trim="configEdit.wowapiClientSecret" maxlength="32" placeholder="e.g TGhTKOwF1_ihKkfW3qPNzomdPJgYXhqD"/>
+					</div>
 				</div>
 				<div id="toast" v-if="toast" :class="toast.type">
 					{{ toast.message }}
@@ -618,6 +625,8 @@
 				</div>
 
 				<tab-characters v-if="screen === 'tab-characters'"></tab-characters>
+
+				<tab-creatures v-if="screen === 'tab-creatures'"></tab-creatures>
 
 				<div class="tab list-tab" id="tab-install" v-if="screen === 'tab-install'">
 					<div class="list-container">

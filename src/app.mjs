@@ -82,7 +82,7 @@ const ExternalLinks = require('./js/external-links');
 const textureRibbon = require('./js/ui/texture-ribbon');
 
 import Listbox from './js/components/listbox.mjs';
-const Listboxb = require('./js/components/listboxb');
+import Listboxb from './js/components/listboxb';
 const Itemlistbox = require('./js/components/itemlistbox');
 const Checkboxlist = require('./js/components/checkboxlist');
 const MenuButton = require('./js/components/menu-button');
@@ -108,6 +108,7 @@ import TabData from './js/ui/tab-data.mjs';
 require('./js/ui/tab-raw');
 require('./js/ui/tab-install');
 import TabCharacters from './js/ui/tab-characters.mjs';
+import TabCreatures from './js/ui/tab-creatures.mjs';
 
 const RCPServer = require('./js/rcp/rcp-server');
 
@@ -589,6 +590,7 @@ document.addEventListener('click', function(e) {
 	app.component('ContextMenu', ContextMenu);
 	app.component('TabData', TabData);
 	app.component('TabCharacters', TabCharacters);
+	app.component('TabCreatures', TabCreatures);
 	app.mount('#container');
 
 	// Log some basic information for potential diagnostics.

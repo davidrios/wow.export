@@ -312,6 +312,31 @@ const runLoadFuncs = async () => {
 	loaders = undefined;
 };
 
+let wowapiToken = null;
+const getWowAPIToken = async (force=false) => {
+	const now = new Date().getTime();
+	if (wowapiToken == null || wowapiToken.expires - 3600*1000 < now || force) {
+		const res = await fetch(
+			'https://oauth.battle.net/token',
+			{
+				method: 'POST',
+				headers: {
+					'Authorization': 'Basic ' + btoa(`${core.view.config.wowapiClientID}:${core.view.config.wowapiClientSecret}`),
+					'Content-Type': 'application/x-www-form-urlencoded'
+				},
+				body: 'grant_type=client_credentials'
+			}
+		);
+		if (!res.ok)
+			throw new Error('Couldnt get token.')
+
+		wowapiToken = await res.json();
+		wowapiToken.expires = now * 1000 + wowapiToken.expires_in;
+	}
+
+	return wowapiToken.access_token;
+}
+
 const core = { 
 	events,
 	view,
@@ -325,7 +350,8 @@ const core = {
 	getDropHandler,
 	registerLoadFunc,
 	runLoadFuncs,
-	openLastExportStream
+	openLastExportStream,
+	getWowAPIToken
 };
 
 module.exports = core;

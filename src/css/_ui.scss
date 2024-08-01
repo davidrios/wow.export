@@ -218,7 +218,9 @@ textarea {
 	font-size: 15px;
 }
 
-input[type="text"], input[type="number"] {
+input[type="text"],
+input[type="password"],
+input[type="number"] {
 	padding: 10px;
 	background: var(--background-dark);
 	color: var(--font-primary);

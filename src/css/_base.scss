@@ -192,6 +192,10 @@ body {
 		background-image: url(./fa-icons/cubes.svg);
 	}
 
+	&-creatures::before {
+		background-image: url(./fa-icons/fish.svg);
+	}
+
 	&-textures::before {
 		background-image: url(./fa-icons/image.svg);
 	}

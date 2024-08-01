@@ -133,5 +133,17 @@ module.exports = {
 		{ match: 'RIFF', ext: '.avi' },
 		{ match: 'WDC3', ext: '.db2' },
 		{ match: 'WDC4', ext: '.db2' }
-	]
+	],
+
+	WOWAPI_NAMESPACE: {
+		wow: 'static',
+		wowt: 'static',
+		wowxptr: 'static',
+		wow_beta: 'static',
+		wow_classic: 'static-classic',
+		wow_classic_beta: 'static-classic',
+		wow_classic_ptr: 'static-classic',
+		wow_classic_era: 'static-classic1x',
+		wow_classic_era_ptr: 'static-classic1x',
+	}
 };

@@ -448,6 +448,24 @@
 	}
 }
 
+#tab-creatures {
+	grid-template-columns: 1fr 3fr;
+
+	.list-container{
+		min-width: 20vw;
+	}
+
+	.filter {
+		input[type=text] {
+			margin-right: 0;
+		}
+
+		input[type=button] {
+			width: 120px;
+		}
+	}
+}
+
 .filter {
 	display: flex;
 	align-items: center;
