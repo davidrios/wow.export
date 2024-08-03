@@ -4,7 +4,7 @@
 	License: MIT
  */
 module.exports = {
-	props: ['modelValue'],
+	props: ['modelValue', 'type'],
 	emits: ['update:modelValue'],
 
 	/**
@@ -14,7 +14,8 @@ module.exports = {
 	mounted: function() {
 		const node = document.createElement('input');
 		node.setAttribute('type', 'file');
-		node.setAttribute('nwdirectory', true);
+		if (this.$props.type === 'directory')
+			node.setAttribute('nwdirectory', true);
 		node.addEventListener('change', () => {
 			this.$emit('update:modelValue', node.value);
 		});

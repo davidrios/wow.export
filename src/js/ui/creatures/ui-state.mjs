@@ -1,3 +1,5 @@
+const generics = require('/js/generics');
+
 const { ref } = Vue;
 
 let shared = null;
@@ -7,19 +9,17 @@ export default function() {
 		return shared;
 
 	const creatures = ref([]);
-	const searchTerm = ref('');
-	const searchPage = ref(1);
-	const searchResults = ref(new Map());
+	const creaturesFilter = generics.debouncedRef('');
 	const creaturesSelection = ref([]);
+	const selectedDisplayInfo = ref();
 	const selectedSoundKit = ref();
 
 	shared = {
 		creatures,
-		searchTerm,
-		searchPage,
-		searchResults,
+		creaturesFilter,
 		creaturesSelection,
-		selectedSoundKit
+		selectedDisplayInfo,
+		selectedSoundKit,
 	};
 
 	return shared;

@@ -84,6 +84,5 @@
 	"rcpEnabled": false,
 	"rcpPort": 17751,
 	"lastExportFile": "",
-	"wowapiClientID": "",
-	"wowapiClientSecret": ""
+	"creatureTemplateJSON": ""
 }

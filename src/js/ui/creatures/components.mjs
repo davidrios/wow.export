@@ -4,16 +4,23 @@ const listfile = require('/js/casc/listfile');
 
 const { computed, inject } = Vue;
 
+function modelidAction(component, _, value) {
+	if (value > 0)
+		component.selectDisplayInfo(value);
+}
 const FORMATTERS = {
 	info: {
-		creature_displays(val) {
-			return { component: 'basic-text', value: val.map(item => item.id).join(', ') };
+		modelid1(value) {
+			return { component: 'action-link', value, action: modelidAction }
 		},
-		type(val) {
-			return { component: 'basic-text', value: `${val.name} (${val.id})` };
+		modelid2(value) {
+			return { component: 'action-link', value, action: modelidAction }
 		},
-		family(val) {
-			return { component: 'basic-text', value: `${val.name} (${val.id})` };
+		modelid3(value) {
+			return { component: 'action-link', value, action: modelidAction }
+		},
+		modelid4(value) {
+			return { component: 'action-link', value, action: modelidAction }
 		}
 	},
 	displayinfo: {
@@ -60,6 +67,16 @@ function getFormatter(table, col) {
 		return tableFs.SoundID;
 
 	return tableFs != null ? tableFs[col] ?? defaultFormatter : defaultFormatter;
+}
+
+const ActionLink = {
+	props: ['value', 'title', 'action'],
+	setup() {
+		return {
+			selectDisplayInfo: inject('selectDisplayInfo')
+		}
+	},
+	template: `<a href="#" @click="action(this, $event, value)" :title="title">{{ value }}</a>`
 }
 
 const SoundLink = {
@@ -193,6 +210,7 @@ export const TableDisplay = {
 		SoundKitView,
 		SoundKitList,
 		SoundLink,
+		ActionLink,
 	},
 	props: ['type', 'data'],
 	setup(props) {

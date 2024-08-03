@@ -11,10 +11,10 @@ export default async function (view) {
 	if (shared !== undefined)
 		return shared;
 
-	const creatureDbs = listfile.getFilteredEntries(/\/creature(displayinfo|modeldata|sounddata)\.db2/);
+	const creatureDbs = listfile.getFilteredEntries(/\/creature(displayinfo(extra)?|modeldata|sounddata)\.db2/);
 
 	// Initialize a loading screen.
-	const progress = core.createProgress(creatureDbs.length + 4);
+	const progress = core.createProgress(creatureDbs.length + 5);
 	view.setScreen('loading');
 	view.isBusy++;
 
@@ -62,6 +62,15 @@ export default async function (view) {
 			soundkitentrymap.get(entry.SoundKitID).push(entry);
 		}
 		allTables.soundkitentrymap = soundkitentrymap;
+
+		await progress.step('Loading creature template JSON...');
+		allTables.creaturetemplate = new Map();
+		if (view.config.creatureTemplateJSON.length > 0) {
+			const templateDbData = await generics.readJSON(view.config.creatureTemplateJSON);
+			templateDbData.sort((a, b) => a.name.localeCompare(b.name));
+			for (const entry of templateDbData)
+				allTables.creaturetemplate.set(entry.entry, {id: entry.entry, ...entry});
+		}
 
 		shared = allTables;
 	} catch (e) {

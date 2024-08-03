@@ -76,7 +76,7 @@
 						<h1>Export Directory</h1>
 						<p>Local directory where files will be exported to.</p>
 						<p v-if="isEditExportPathConcerning" class="concern">Warning: Using an export path with spaces may lead to problems in most 3D programs.</p>
-						<file-field v-model="configEdit.exportDirectory" :class="{ concern: isEditExportPathConcerning }"></file-field>
+						<file-field v-model="configEdit.exportDirectory" type="directory" :class="{ concern: isEditExportPathConcerning }"></file-field>
 					</div>
 					<div>
 						<h1>Show File Data IDs</h1>
@@ -353,10 +353,9 @@
 						<input type="text" v-model.trim="configEdit.lastExportFile" :placeholder="lastExportPathDefault" class="long"/>
 					</div>
 					<div>
-						<h1>Battle.net API</h1>
-						<p>Credentials for official World of Warcraft API. Check <a href="https://develop.battle.net">https://develop.battle.net</a></p>
-						<input type="text" width="140" v-model.trim="configEdit.wowapiClientID" maxlength="32" placeholder="e.g 77d9048f49fc40f6b0400ac6f477c43c"/>
-						<input type="password" width="140" v-model.trim="configEdit.wowapiClientSecret" maxlength="32" placeholder="e.g TGhTKOwF1_ihKkfW3qPNzomdPJgYXhqD"/>
+						<h1>Creature Template JSON</h1>
+						<p>JSON containing creature_template database from acore</p>
+						<file-field v-model="configEdit.creatureTemplateJSON"></file-field>
 					</div>
 				</div>
 				<div id="toast" v-if="toast" :class="toast.type">

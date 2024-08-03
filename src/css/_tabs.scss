@@ -455,16 +455,6 @@
 		min-width: 20vw;
 	}
 
-	.filter {
-		input[type=text] {
-			margin-right: 0;
-		}
-
-		input[type=button] {
-			width: 120px;
-		}
-	}
-
 	.preview-container {
 		align-items: start;
 		overflow: auto;
@@ -477,6 +467,10 @@
 
 			&:first-child {
 				padding-left: 0;
+			}
+
+			div > h3 {
+				margin-top: 1em;
 			}
 		}
 
