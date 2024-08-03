@@ -431,6 +431,20 @@ document.addEventListener('click', function(e) {
 			 */
 			viewTextures: function(item) {
 				TabItems.viewItemTextures(item);
+			},
+
+			goToModel: function(fileName) {
+				this.setScreen('tab-models');
+				this.userInputFilterModels = '';
+				this.overrideModelList = [fileName];
+				this.selectionModels = [fileName];
+				this.overrideModelName = fileName;
+			},
+
+			goToSound: function(fileName) {
+				this.setScreen('tab-sounds');
+				this.userInputFilterSounds = fileName;
+				this.selectionSounds = [fileName];
 			}
 		},
 

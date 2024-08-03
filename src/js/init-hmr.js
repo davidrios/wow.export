@@ -44,6 +44,16 @@ chrome.runtime = {
 	}
 }
 
+nw.Clipboard = {
+	get() {
+		return {
+			set(value, type) {
+				mainWindow.write(msgpack.encode({ type: "copytoclipboard", value, valueType: type }));
+			}
+		}
+	}
+}
+
 const origFetch = fetch;
 fetch = async function (url, init) {
 	if (!url.startsWith('http'))

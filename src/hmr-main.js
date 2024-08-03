@@ -85,6 +85,10 @@ mainWindow.on('connection', async (socket) => {
 				win.setProgressBar(message.value);
 				break;
 
+			case 'copytoclipboard':
+				nw.Clipboard.get().set(message.value, message.valueType);
+				break;
+
 			case 'fetch':
 				socket.write(msgpack.encode({
 					type: 'fetchRes',

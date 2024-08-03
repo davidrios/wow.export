@@ -11,13 +11,15 @@ export default function() {
 	const searchPage = ref(1);
 	const searchResults = ref(new Map());
 	const creaturesSelection = ref([]);
+	const selectedSoundKit = ref();
 
 	shared = {
 		creatures,
 		searchTerm,
 		searchPage,
 		searchResults,
-		creaturesSelection
+		creaturesSelection,
+		selectedSoundKit
 	};
 
 	return shared;
