@@ -38,6 +38,7 @@
 						<span @click.self="restartApplication" id="menu-extra-restart">Restart wow.export</span>
 						<span v-if="isDev" @click.self="runIntegrationTests" id="menu-extra-tests">Run Integration Tests</span>
 						<span v-if="isDev" @click.self="reloadStylesheet" id="menu-extra-style">Reload Styling</span>
+						<span @click.self="reexportTextures">Re-export textures</span>
 					</context-menu>
 				</div>
 			</div>

@@ -94,6 +94,7 @@ const MapViewer = require('./js/components/map-viewer');
 import DataTable from './js/components/data-table.mjs';
 const ResizeLayer = require('./js/components/resize-layer');
 const ContextMenu = require('./js/components/context-menu');
+import { reexportTextures } from './js/utils.mjs';
 
 const TabTextures = require('./js/ui/tab-textures');
 const TabItems = require('./js/ui/tab-items');
@@ -445,6 +446,10 @@ document.addEventListener('click', function(e) {
 				this.setScreen('tab-sounds');
 				this.userInputFilterSounds = fileName;
 				this.selectionSounds = [fileName];
+			},
+
+			reexportTextures: function() {
+				return reexportTextures(this);
 			}
 		},
 
@@ -768,3 +773,13 @@ document.addEventListener('click', function(e) {
 	core.rcp = new RCPServer();
 	core.rcp.load();
 })();
+
+if (import.meta.hot) {
+	import.meta.hot.accept(['/js/utils.mjs'], ([newModule]) => {
+		if (newModule == null)
+			return;
+
+		core.view.reexportTextures = function () { return newModule.reexportTextures(core.view) };
+		console.log('new');
+	});
+}
