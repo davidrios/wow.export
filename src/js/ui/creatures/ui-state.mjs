@@ -13,6 +13,7 @@ export default function() {
 	const creaturesSelection = ref([]);
 	const selectedDisplayInfo = ref();
 	const selectedSoundKit = ref();
+	const selectedSoundKitKeys = ref();
 
 	shared = {
 		creatures,
@@ -20,6 +21,7 @@ export default function() {
 		creaturesSelection,
 		selectedDisplayInfo,
 		selectedSoundKit,
+		selectedSoundKitKeys,
 	};
 
 	return shared;

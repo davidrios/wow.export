@@ -34,14 +34,14 @@ const FORMATTERS = {
 		}
 	},
 	sounddata: {
-		SoundID: function (value) {
-			return { component: 'sound-kit-view', value }
+		SoundID(value, name) {
+			return { component: 'sound-kit-view', value, checkbox: true, name }
 		},
-		SoundFidget(value) {
-			return { component: 'sound-kit-list', value }
+		SoundFidget(value, name) {
+			return { component: 'sound-kit-list', value, checkbox: true, name }
 		},
-		CustomAttack(value) {
-			return { component: 'sound-kit-list', value }
+		CustomAttack(value, name) {
+			return { component: 'sound-kit-list', value, checkbox: true, name }
 		}
 	},
 	soundkitentry: {
@@ -63,7 +63,7 @@ function defaultFormatter(value) {
 function getFormatter(table, col) {
 	const tableFs = FORMATTERS[table];
 
-	if (table === 'sounddata' && col.endsWith('ID'))
+	if (table === 'sounddata' && col.endsWith('ID') && col !== 'ID')
 		return tableFs.SoundID;
 
 	return tableFs != null ? tableFs[col] ?? defaultFormatter : defaultFormatter;
@@ -103,27 +103,46 @@ const SoundLink = {
 }
 
 const SoundKitView = {
-	props: ['value'],
-	setup() {
+	props: ['value', 'name', 'checkbox'],
+	setup(props) {
+		const selectedSoundKitKeys = inject('selectedSoundKitKeys');
+		const selectedSoundKitKey = computed({
+			get() { return selectedSoundKitKeys.value[props.name]; },
+			set(newValue) { selectedSoundKitKeys.value[props.name] = newValue }
+		});
+
 		return {
-			showSoundKit: inject('showSoundKit')
+			showSoundKit: inject('showSoundKit'),
+			selectedSoundKitKey
 		}
 	},
-	template: `<a href="#" @click="showSoundKit(value)">{{ value }}</a>`
+	template: `
+		<div>
+			<input type="checkbox" v-if="checkbox" v-model="selectedSoundKitKey" />
+			<a href="#" @click="showSoundKit(value)">{{ value }}</a>
+		</div>`
 }
 
 const SoundKitList = {
 	components: {
 		SoundKitView
 	},
-	props: ['value'],
+	props: ['value', 'name', 'checkbox'],
 	setup(props) {
+		const selectedSoundKitKeys = inject('selectedSoundKitKeys');
+		const selectedSoundKitKey = computed({
+			get() { return selectedSoundKitKeys.value[props.name]; },
+			set(newValue) { selectedSoundKitKeys.value[props.name] = newValue }
+		});
+
 		return {
-			items: computed(() => props.value.filter(item => item !== 0) )
+			items: computed(() => props.value.filter(item => item !== 0) ),
+			selectedSoundKitKey
 		}
 	},
 	template: `
 		<div>
+			<input type="checkbox" v-if="checkbox" v-model="selectedSoundKitKey" />
 			<ul v-if="items.length > 0">
 				<li v-for="item in items"><sound-kit-view :value="item"></sound-kit-view></li>
 			</ul>
@@ -219,7 +238,7 @@ export const TableDisplay = {
 				const res = {};
 
 				for (const key in props.data)
-					res[key] = getFormatter(props.type, key)(props.data[key]);
+					res[key] = getFormatter(props.type, key)(props.data[key], key);
 
 				return res;
 			}),

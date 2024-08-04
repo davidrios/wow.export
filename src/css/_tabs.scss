@@ -495,10 +495,21 @@
 					}
 				}
 
-				ul[component=texture-list],
-				div[component=sound-kit-list] {
+				ul[component=texture-list] {
 					width: 100%;
 					margin-left: 2em;
+				}
+
+				div[component=sound-kit-list] {
+					ul {
+						margin-left: 1.2em;
+					}
+				}
+
+				div[component=sound-kit-view] {
+					input {
+						margin-right: 0.3em;
+					}
 				}
 
 				> a {
