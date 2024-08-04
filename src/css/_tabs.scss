@@ -17,8 +17,10 @@
 	width: 210px;
 	grid-row: 1 / span 2;
 	margin-top: 20px;
+	margin-bottom: 10px;
 	padding-right: 20px;
 	box-sizing: border-box;
+	overflow: auto;
 
 	span.header {
 		display: block;

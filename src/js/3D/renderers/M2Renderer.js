@@ -45,6 +45,11 @@ class M2Renderer {
 		this.m2 = new M2Loader(this.data);
 		await this.m2.load();
 
+		this.backfaceCulling = !!core.view.config.modelsExportAddInvertedGeosets;
+		core.view.$watch('core.view.config.modelsExportAddInvertedGeosets', () => {
+			this.backfaceCulling = !!core.view.config.modelsExportAddInvertedGeosets;
+		})
+
 		this.loadTextures();
 
 		if (this.m2.vertices.length > 0) {
@@ -347,7 +352,7 @@ class M2Renderer {
 
 			this.renderCache.retire(this.materials[i]);
 
-			const material = new THREE.MeshPhongMaterial({ name: fileDataID, map: tex, side: THREE.DoubleSide, wireframe: renderWireframe });
+			const material = new THREE.MeshPhongMaterial({ name: fileDataID, map: tex, side: this.backfaceCulling ? THREE.FrontSide : THREE.DoubleSide, wireframe: renderWireframe });
 			this.renderCache.register(material, tex);
 
 			this.materials[i] = material;
