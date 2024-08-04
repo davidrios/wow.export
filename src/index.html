@@ -574,6 +574,10 @@
 									<input type="checkbox" v-model="config.modelsExportAddInvertedGeosets"/>
 									<span>Add inverted geosets</span>
 								</label>
+								<label class="ui-checkbox">
+									<input type="checkbox" v-model="config.modelsExportOriginalName"/>
+									<span>Use original name</span>
+								</label>
 							</template>
 							<template v-if="config.exportModelFormat === 'RAW'">
 								<label class="ui-checkbox" title="Export raw .skin files with M2 exports">
