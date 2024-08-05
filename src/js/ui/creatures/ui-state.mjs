@@ -8,7 +8,6 @@ export default function() {
 	if (shared != null)
 		return shared;
 
-	const creatures = ref([]);
 	const creaturesFilter = generics.debouncedRef('');
 	const creaturesSelection = ref([]);
 	const selectedDisplayInfo = ref();
@@ -16,7 +15,6 @@ export default function() {
 	const selectedSoundKitKeys = ref();
 
 	shared = {
-		creatures,
 		creaturesFilter,
 		creaturesSelection,
 		selectedDisplayInfo,

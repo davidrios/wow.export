@@ -21,19 +21,21 @@ export default {
 		const uiState = loadUiState();
 
 		const {
-			creatures,
+			creaturesFilter,
 			creaturesSelection,
 			selectedDisplayInfo,
 			selectedSoundKit,
 			selectedSoundKitKeys,
 		} = uiState;
 
+		let creatures;
+
 		let d;
 		// setup can't be async, so this needs to be scheduled like this
 		(async function () {
 			d = await loadData(view);
 
-			creatures.value = Array.from(d.creaturetemplate.values()).map(entry => {
+			creatures = Array.from(d.creaturetemplate.values()).map(entry => {
 				const name = new String(`${entry.name} (${entry.id})`);
 				name.id = entry.id;
 				return name;
@@ -53,6 +55,13 @@ export default {
 			window._aaa = d;
 			isLoaded.value = d != null;
 		})();
+
+		const sortedCreatures = computed(() => {
+			if (parseInt(creaturesFilter.value).toString() === creaturesFilter.value)
+				return creatures.sort((a, b) => a.id === b.id ? 0 : (a.id < b.id ? -1 : 1));
+			else
+				return creatures.sort((a, b) => a.localeCompare(b));
+		})
 
 		function loadSelected(creatureId) {
 			selectedSoundKit.value = null;
@@ -205,6 +214,7 @@ export default {
 			config: view.config,
 			isLoaded,
 			isBusy,
+			sortedCreatures,
 			selectedData,
 			soundKit,
 			soundKitEntries,
@@ -217,7 +227,7 @@ export default {
 		<div class="tab list-tab" id="tab-creatures" v-if="isLoaded">
 			<div class="list-container">
 				<listbox
-					v-model:selection="creaturesSelection" :items="creatures" :filter="creaturesFilter" unittype="creature"
+					v-model:selection="creaturesSelection" :items="sortedCreatures" :filter="creaturesFilter" unittype="creature"
 					:single="true" :regex="config.regexFilters" :pasteselection="config.pasteSelection"
 					@update:selection="loadSelected($event[0]?.id)"
 				></listbox>
