@@ -42,7 +42,7 @@ export default {
 			})
 
 			if (creaturesSelection.value.length > 0)
-				creaturesSelection.value = creatures.value.filter(entry => entry.id === creaturesSelection.value[0].id);
+				creaturesSelection.value = creatures.filter(entry => entry.id === creaturesSelection.value[0].id);
 
 			if (selectedSoundKitKeys.value == null) {
 				selectedSoundKitKeys.value = Object.fromEntries(
