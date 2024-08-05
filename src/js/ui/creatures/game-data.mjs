@@ -55,6 +55,8 @@ export default async function (view) {
 		await progress.step('Loading SoundKitEntry.db2...');
 		const soundKitEntry = new WDCReader('DBFilesClient/SoundKitEntry.db2');
 		await soundKitEntry.parse();
+		allTables.soundkitentry = soundKitEntry;
+
 		const soundkitentrymap = new Map();
 		for (const entry of soundKitEntry.rows.values()) {
 			if (!soundkitentrymap.has(entry.SoundKitID))
