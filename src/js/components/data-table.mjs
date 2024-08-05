@@ -255,18 +255,20 @@ export default {
 					<div>
 					</div>
 				</div>
-				<table>
-					<thead ref="datatableheader">
-						<tr>
-							<th v-for="header in headers">{{header}}</th>
-						</tr>
-					</thead>
-					<tbody ref="datatablebody">
-						<tr v-for="row in displayItems">
-							<td v-for="field in row">{{field}}</td>
-						</tr>
-					</tbody>
-				</table>
+				<div class="table-container">
+					<table>
+						<thead ref="datatableheader">
+							<tr>
+								<th v-for="header in headers">{{header}}</th>
+							</tr>
+						</thead>
+						<tbody ref="datatablebody">
+							<tr v-for="row in displayItems">
+								<td v-for="field in row">{{field}}</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
 			</div>
 			<div class="list-status">{{ filteredItems.length }} row{{ (filteredItems.length != 1 ? 's' : '') }} found.</div>
 		</div
