@@ -105,6 +105,7 @@ export default {
 			selectedDisplayInfo.value = id;
 		});
 
+		const soundKit = computed(() => d.soundkit.getRow(selectedSoundKit.value));
 		const soundKitEntries = computed(() => d.soundkitentrymap.get(selectedSoundKit.value));
 
 		async function exportSelected() {
@@ -158,7 +159,10 @@ export default {
 						if (entries == null)
 							continue;
 
-						soundKits[id] = entries.map(entry => ({...entry, FileData: addToExport(listfile.getByID(entry.FileDataID))}))
+						soundKits[id] = {
+							...d.soundkit.getRow(id),
+							entries: entries.map(entry => ({...entry, FileData: addToExport(listfile.getByID(entry.FileDataID))}))
+						}
 					}
 				}
 			}
@@ -202,6 +206,7 @@ export default {
 			isLoaded,
 			isBusy,
 			selectedData,
+			soundKit,
 			soundKitEntries,
 			...uiState,
 			loadSelected,
@@ -243,14 +248,17 @@ export default {
 					<table-display type='sounddata' :data="selectedData.sounddata"></table-display>
 				</div>
 				<div>
-					<h3>SoundKitEntries</h3>
 					<template v-if="soundKitEntries != null">
+						<h3>SoundKitEntries</h3>
 						<ul class="sound-kit-entries" v-if="soundKitEntries.length > 0">
 							<li v-for="entry in soundKitEntries">
 								<table-display type='soundkitentry' :data="entry"></table-display>
 							</li>
 						</ul>
 						<p v-else>No entries.</p>
+
+						<h3>SoundKit</h3>
+						<table-display type='soundkit' :data="soundKit"></table-display>
 					</template>
 					<p v-else>Click on a sound ID...</p>
 				</div>
