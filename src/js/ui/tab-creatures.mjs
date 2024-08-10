@@ -18,14 +18,13 @@ export default {
 
 		const isLoaded = ref(false);
 		const isBusy = ref(false);
-		const uiState = loadUiState();
+		const uiState = loadUiState(view);
 
 		const {
 			creaturesFilter,
 			creaturesSelection,
 			selectedDisplayInfo,
 			selectedSoundKit,
-			selectedSoundKitKeys,
 		} = uiState;
 
 		let creatures;
@@ -43,14 +42,6 @@ export default {
 
 			if (creaturesSelection.value.length > 0)
 				creaturesSelection.value = creatures.filter(entry => entry.id === creaturesSelection.value[0].id);
-
-			if (selectedSoundKitKeys.value == null) {
-				selectedSoundKitKeys.value = Object.fromEntries(
-					Array.from(d.creaturesounddata.schema.keys())
-						.filter(key => (key.endsWith('ID') && key !== 'ID') || key === 'SoundFidget' || key === 'CustomAttack')
-						.map(key => [key, true])
-				);
-			}
 
 			window._aaa = d;
 			isLoaded.value = d != null;
@@ -108,8 +99,6 @@ export default {
 			selectedSoundKit.value = id;
 		});
 
-		provide('selectedSoundKitKeys', selectedSoundKitKeys);
-
 		provide('selectDisplayInfo', function selectDisplayInfo(id) {
 			selectedDisplayInfo.value = id;
 		});
@@ -153,8 +142,8 @@ export default {
 					},
 				};
 
-				for (const name in selectedSoundKitKeys.value) {
-					if (!selectedSoundKitKeys.value[name] || modelsounddata == null || modelsounddata[name] == null)
+				for (const name in view.config.creaturesSelectedSoundKitKeys) {
+					if (!view.config.creaturesSelectedSoundKitKeys[name] || modelsounddata == null || modelsounddata[name] == null)
 						continue;
 
 					let ids = [];

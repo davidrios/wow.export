@@ -105,10 +105,10 @@ const SoundLink = {
 const SoundKitView = {
 	props: ['value', 'name', 'checkbox'],
 	setup(props) {
-		const selectedSoundKitKeys = inject('selectedSoundKitKeys');
+		const view = inject('view');
 		const selectedSoundKitKey = computed({
-			get() { return selectedSoundKitKeys.value[props.name]; },
-			set(newValue) { selectedSoundKitKeys.value[props.name] = newValue }
+			get() { return view.config.creaturesSelectedSoundKitKeys[props.name]; },
+			set(newValue) { view.config.creaturesSelectedSoundKitKeys[props.name] = newValue }
 		});
 
 		return {
@@ -129,10 +129,10 @@ const SoundKitList = {
 	},
 	props: ['value', 'name', 'checkbox'],
 	setup(props) {
-		const selectedSoundKitKeys = inject('selectedSoundKitKeys');
+		const view = inject('view');
 		const selectedSoundKitKey = computed({
-			get() { return selectedSoundKitKeys.value[props.name]; },
-			set(newValue) { selectedSoundKitKeys.value[props.name] = newValue }
+			get() { return view.config.creaturesSelectedSoundKitKeys[props.name]; },
+			set(newValue) { view.config.creaturesSelectedSoundKitKeys[props.name] = newValue }
 		});
 
 		return {

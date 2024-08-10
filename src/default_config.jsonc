@@ -73,6 +73,7 @@
 	"mapsIncludeGameObjects": true,
 	"mapsIncludeHoles": true,
 	"mapsExportRaw": false,
+	"creaturesSelectedSoundKitKeys": {},
 	"regexFilters": false,
 	"exportMapQuality": 4096,
 	"splitLargeTerrainBakes": true,
