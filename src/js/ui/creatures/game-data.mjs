@@ -11,10 +11,11 @@ export default async function (view) {
 	if (shared !== undefined)
 		return shared;
 
-	const creatureDbs = listfile.getFilteredEntries(/\/creature(displayinfo(extra)?|modeldata|sounddata)\.db2/);
+	const loadedDbs = listfile.getFilteredEntries(/\/creature(displayinfo(extra)?|modeldata|sounddata)\.db2/)
+		.concat(listfile.getFilteredEntries(/\/(modelfiledata|soundkit|soundkitentry|npcmodelitemslotdisplayinfo|itemdisplayinfo)\.db2/));
 
 	// Initialize a loading screen.
-	const progress = core.createProgress(creatureDbs.length + 5);
+	const progress = core.createProgress(loadedDbs.length + 2);
 	view.setScreen('loading');
 	view.isBusy++;
 
@@ -26,7 +27,7 @@ export default async function (view) {
 		);
 
 		const allTables = {};
-		for (const file of creatureDbs) {
+		for (const file of loadedDbs) {
 			try {
 				const name = path.basename(file.fileName, '.db2');
 
@@ -42,28 +43,21 @@ export default async function (view) {
 			}
 		}
 
-		await progress.step('Loading ModelFileData.db2...');
-		const modelFileData = new WDCReader('DBFilesClient/ModelFileData.db2');
-		await modelFileData.parse();
-		allTables.modelfiledata = modelFileData;
-
-		await progress.step('Loading SoundKit.db2...');
-		const soundKit = new WDCReader('DBFilesClient/SoundKit.db2');
-		await soundKit.parse();
-		allTables.soundkit = soundKit;
-
-		await progress.step('Loading SoundKitEntry.db2...');
-		const soundKitEntry = new WDCReader('DBFilesClient/SoundKitEntry.db2');
-		await soundKitEntry.parse();
-		allTables.soundkitentry = soundKitEntry;
-
 		const soundkitentrymap = new Map();
-		for (const entry of soundKitEntry.rows.values()) {
+		for (const entry of allTables.soundkitentry?.rows.values() ?? []) {
 			if (!soundkitentrymap.has(entry.SoundKitID))
 				soundkitentrymap.set(entry.SoundKitID, []);
 			soundkitentrymap.get(entry.SoundKitID).push(entry);
 		}
 		allTables.soundkitentrymap = soundkitentrymap;
+
+		const npcmodelitemslotdisplayinfomap = new Map();
+		for (const entry of allTables.npcmodelitemslotdisplayinfo.rows.values()) {
+			if (!npcmodelitemslotdisplayinfomap.has(entry.NpcModelID))
+				npcmodelitemslotdisplayinfomap.set(entry.NpcModelID, []);
+			npcmodelitemslotdisplayinfomap.get(entry.NpcModelID).push(entry);
+		}
+		allTables.npcmodelitemslotdisplayinfomap = npcmodelitemslotdisplayinfomap;
 
 		await progress.step('Loading creature template JSON...');
 		allTables.creaturetemplate = new Map();

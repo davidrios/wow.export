@@ -1,6 +1,8 @@
 const path = require('path');
 
 const listfile = require('/js/casc/listfile');
+const DBTextureFileData = require('/js/db/caches/DBTextureFileData');
+const DBModelFileData = require('/js/db/caches/DBModelFileData');
 
 const { computed, inject } = Vue;
 
@@ -28,6 +30,11 @@ const FORMATTERS = {
 			return { component: 'texture-list', value}
 		}
 	},
+	displayinfoextra: {
+		BakeMaterialResourcesID(value) {
+			return { component: 'texture-resource', value}
+		}
+	},
 	modeldata: {
 		FileDataID(value) {
 			return { component: 'model-view', value }
@@ -48,6 +55,20 @@ const FORMATTERS = {
 		FileDataID(value) {
 			return { component: 'sound-link', value }
 		}
+	},
+	itemdisplayinfo: {
+		_default(value) {
+			if (value === 0 || (value.every != null && value.every(item => item === 0)))
+				return null;
+
+			return defaultFormatter(value);
+		},
+		ModelMaterialResourcesID(value) {
+			return { component: 'texture-resource-list', value}
+		},
+		ModelResourcesID(value) {
+			return { component: 'model-resource-list', value}
+		}
 	}
 }
 
@@ -66,7 +87,97 @@ function getFormatter(table, col) {
 	if (table === 'sounddata' && col.endsWith('ID') && col !== 'ID')
 		return tableFs.SoundID;
 
-	return tableFs != null ? tableFs[col] ?? defaultFormatter : defaultFormatter;
+	return tableFs != null ? tableFs[col] ?? tableFs._default ?? defaultFormatter : defaultFormatter;
+}
+
+const ModelResource = {
+	props: ['value'],
+	setup(props) {
+		const view = inject('view');
+
+		return {
+			item: computed(() => {
+				const id = DBModelFileData.getModelFileDataID(props.value)[0];
+				const file = listfile.getByID(id);
+				return {
+					id,
+					file,
+					name: path.basename(file),
+				}
+			}),
+			goToModel(e, file) {
+				e.preventDefault();
+				view.goToModel(file);
+			}
+		}
+	},
+	template: `<a href="#" @click="goToModel($event, item.file)" :title="item.file">{{ value }} [{{ item.name }}]</a>`
+}
+
+const ModelResourceList = {
+	components: {
+		ModelResource,
+	},
+	props: ['value'],
+	setup(props) {
+		return {
+			items: computed(() => props.value
+				.filter(item => item > 0)
+			)
+		}
+	},
+	template: `
+		<ul>
+			<li v-for="item in items">
+				<model-resource :value="item"></model-resource>
+			</li>
+		</ul>
+	`
+}
+
+const TextureResource = {
+	props: ['value'],
+	setup(props) {
+		const view = inject('view');
+
+		return {
+			item: computed(() => {
+				const id = DBTextureFileData.getTextureFDIDsByMatID(props.value)[0];
+				const file = listfile.getByID(id);
+				return {
+					id,
+					file,
+					name: path.basename(file),
+				}
+			}),
+			goToTexture(e, id) {
+				e.preventDefault();
+				view.goToTexture(id);
+			}
+		}
+	},
+	template: `<a href="#" @click="goToTexture($event, item.id)" :title="item.file">{{ value }} [{{ item.name }}]</a>`
+}
+
+const TextureResourceList = {
+	components: {
+		TextureResource,
+	},
+	props: ['value'],
+	setup(props) {
+		return {
+			items: computed(() => props.value
+				.filter(item => item > 0)
+			)
+		}
+	},
+	template: `
+		<ul>
+			<li v-for="item in items">
+				<texture-resource :value="item"></texture-resource>
+			</li>
+		</ul>
+	`
 }
 
 const ActionLink = {
@@ -230,6 +341,10 @@ export const TableDisplay = {
 		SoundKitList,
 		SoundLink,
 		ActionLink,
+		TextureResource,
+		TextureResourceList,
+		ModelResource,
+		ModelResourceList,
 	},
 	props: ['type', 'data'],
 	setup(props) {
@@ -243,6 +358,9 @@ export const TableDisplay = {
 				return res;
 			}),
 			isItemShown(type, key, val) {
+				if (val == null)
+					return false;
+
 				if (type !== 'sounddata')
 					return true;
 

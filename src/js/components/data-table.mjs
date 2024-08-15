@@ -108,11 +108,16 @@ export default {
 					// Regular expression did not compile, skip filtering.
 				}
 			} else {
-				const filter = this.filter.trim().toLowerCase();
+				let filter = this.filter.trim().toLowerCase();
 				if (filter.length > 0) {
+					const exact = filter.startsWith('==');
+					filter = exact ? filter.substring(2) : filter;
 					res = res.filter(row => row.some(col =>
-						(typeof col === 'string' && col.toLowerCase().includes(filter)) ||
-						(typeof col === 'number' && col.toString().toLowerCase().includes(filter)) // also filter by id
+						exact
+							? (typeof col === 'string' && col.toLowerCase() === filter) ||
+								(typeof col === 'number' && col.toString().toLowerCase() === filter) // also filter by id
+							: (typeof col === 'string' && col.toLowerCase().includes(filter)) ||
+								(typeof col === 'number' && col.toString().toLowerCase().includes(filter)) // also filter by id
 					));
 				}
 			}

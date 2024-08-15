@@ -4,10 +4,12 @@ const listfile = require('/js/casc/listfile');
 const BLPFile = require('../casc/blp');
 const ExportHelper = require('/js/casc/export-helper');
 const JSONWriter = require('/js/3D/writers/JSONWriter');
+const { getGeosetName } = require('/js/3D/GeosetMapper');
 
 import loadData from './creatures/game-data.mjs';
 import loadUiState from './creatures/ui-state.mjs';
 import { TableDisplay } from './creatures/components.mjs';
+import loadCharacterData from './characters/game-data.mjs';
 
 const { ref, computed, inject, provide } = Vue;
 
@@ -30,9 +32,12 @@ export default {
 		let creatures;
 
 		let d;
+		let cd;
 		// setup can't be async, so this needs to be scheduled like this
 		(async function () {
+			cd = await loadCharacterData(view, true);
 			d = await loadData(view);
+			view.setScreen('tab-creatures');
 
 			creatures = Array.from(d.creaturetemplate.values()).map(entry => {
 				const name = new String(`${entry.name} (${entry.id})`);
@@ -44,6 +49,7 @@ export default {
 				creaturesSelection.value = creatures.filter(entry => entry.id === creaturesSelection.value[0].id);
 
 			window._aaa = d;
+			window._bbb = cd;
 			isLoaded.value = d != null;
 		})();
 
@@ -105,6 +111,86 @@ export default {
 
 		const soundKit = computed(() => d.soundkit.getRow(selectedSoundKit.value));
 		const soundKitEntries = computed(() => d.soundkitentrymap.get(selectedSoundKit.value));
+
+		const npcItemSlotEntries = computed(() => 
+			selectedData.value.creaturedisplayinfoextra == null
+				? null
+				: d.npcmodelitemslotdisplayinfomap.get(selectedData.value.creaturedisplayinfoextra.ID)
+		);
+
+		const itemDisplayInfo = computed(() => {
+			if (npcItemSlotEntries.value == null)
+				return null;
+
+			return Object.fromEntries(npcItemSlotEntries.value.map(entry => [entry.ItemDisplayInfoID, d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID)]));
+		});
+
+		const enabledGeosets = computed(() => {
+			if (selectedData.value.creaturedisplayinfoextra == null)
+				return null;
+
+			const race = selectedData.value.creaturedisplayinfoextra.DisplayRaceID;
+			const sex = selectedData.value.creaturedisplayinfoextra.DisplaySexID;
+
+			const model = cd.chrRaceXChrModelMap.get(race).get(sex);
+			const availableOptions = cd.optionsByChrModel.get(model);
+			const choices = new Map();
+			for (const option of availableOptions) {
+				if (!choices.has(option.customizationID))
+					choices.set(option.customizationID, new Map());
+
+				for (const choice of cd.optionToChoices.get(option.id))
+					choices.get(option.customizationID).set(choice.orderIndex, choice);
+			}
+
+			// const face = choices.get(2).get(selectedData.value.creaturedisplayinfoextra.FaceID);
+			const hairStyle = choices.get(3).get(selectedData.value.creaturedisplayinfoextra.HairStyleID);
+			const features = choices.has(14) ? choices.get(14).get(selectedData.value.creaturedisplayinfoextra.FacialHairID) : null;
+
+			const enabled = [];
+
+			for (const opt of [hairStyle, features]) {
+				if (opt == null)
+					continue;
+
+				const chrCustGeoID = cd.choiceToGeoset.get(opt.id);
+				let geoset = cd.geosetMap.get(chrCustGeoID);
+				if (geoset >= 200 && geoset < 300)
+					geoset = geoset - 98;
+
+				enabled.push(getGeosetName(geoset, geoset));
+				console.log(chrCustGeoID, geoset, getGeosetName(geoset, geoset));
+			}
+
+			const itemBySlot = new Map();
+			for (const itemSlot of Object.values(npcItemSlotEntries.value))
+				itemBySlot.set(itemSlot.ItemSlot, itemDisplayInfo.value[itemSlot.ItemDisplayInfoID]);
+
+			if (itemBySlot.has(2)) {
+				if (itemBySlot.get(2).GeosetGroup[0] > 0)
+					enabled.push(`Wrist${itemBySlot.get(2).GeosetGroup[0] + 1}`);
+			}
+
+			if (itemBySlot.has(5)) {
+				const chest = itemBySlot.get(5);
+				if (chest.GeosetGroup[2] > 0) {
+					enabled.push(`Trousers${chest.GeosetGroup[2] + 1}`);
+					enabled.push('-Boots1');
+				}
+			}
+
+			if (itemBySlot.has(6)) {
+				if (itemBySlot.get(6).GeosetGroup[0] > 0)
+					enabled.push(`Boots${itemBySlot.get(6).GeosetGroup[0] + 1}`);
+			}
+
+			if (itemBySlot.has(8)) {
+				if (itemBySlot.get(8).GeosetGroup[0] > 0)
+					enabled.push(`Gloves${itemBySlot.get(8).GeosetGroup[0] + 1}`);
+			}
+
+			return enabled;
+		})
 
 		async function exportSelected() {
 			const id = selectedCreatureId.value;
@@ -207,6 +293,9 @@ export default {
 			selectedData,
 			soundKit,
 			soundKitEntries,
+			npcItemSlotEntries,
+			itemDisplayInfo,
+			enabledGeosets,
 			...uiState,
 			loadSelected,
 			exportSelected
@@ -237,10 +326,23 @@ export default {
 						<h3>DisplayInfoExtra</h3>
 						<table-display type='displayinfoextra' :data="selectedData.creaturedisplayinfoextra"></table-display>
 					</div>
+
+					<div v-if="npcItemSlotEntries && npcItemSlotEntries.length > 0">
+						<h3>NPCItemSlots</h3>
+						<ul class="table-entries">
+							<li v-for="entry in npcItemSlotEntries">
+								<table-display type='npcmodelitemslotdisplayinfo' :data="entry"></table-display>
+								<table-display type='itemdisplayinfo' :data="itemDisplayInfo[entry.ItemDisplayInfoID]"></table-display>
+							</li>
+						</ul>
+					</div>
 				</div>
 				<div>
 					<h3>ModelData</h3>
 					<table-display type='modeldata' :data="selectedData.modeldata"></table-display>
+
+					<h3>Enabled Geosets</h3>
+					<div>{{ enabledGeosets }}</div>
 				</div>
 				<div>
 					<h3>SoundData</h3>
@@ -249,7 +351,7 @@ export default {
 				<div>
 					<template v-if="soundKitEntries != null">
 						<h3>SoundKitEntries</h3>
-						<ul class="sound-kit-entries" v-if="soundKitEntries.length > 0">
+						<ul class="table-entries" v-if="soundKitEntries.length > 0">
 							<li v-for="entry in soundKitEntries">
 								<table-display type='soundkitentry' :data="entry"></table-display>
 							</li>

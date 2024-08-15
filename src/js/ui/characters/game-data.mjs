@@ -5,7 +5,7 @@ const DBCreatures = require('/js/db/caches/DBCreatures');
 
 let shared = null;
 
-export default async function (view) {
+export default async function (view, skipScreen) {
 	if (shared != null)
 		return shared;
 
@@ -120,7 +120,11 @@ export default async function (view) {
 			else
 				optionName = 'Option ' + chrCustomizationOptionRow.OrderIndex;
 
-			optionsByChrModel.get(chrCustomizationOptionRow.ChrModelID).push({ id: chrCustomizationOptionID, label: optionName });
+			optionsByChrModel.get(chrCustomizationOptionRow.ChrModelID).push({
+				id: chrCustomizationOptionID,
+				label: optionName,
+				customizationID: chrCustomizationOptionRow.ChrCustomizationID
+			});
 
 			for (const [chrCustomizationChoiceID, chrCustomizationChoiceRow] of chrCustChoiceDB.getAllRows()) {
 				if (chrCustomizationChoiceRow.ChrCustomizationOptionID != chrCustomizationOptionID)
@@ -136,7 +140,7 @@ export default async function (view) {
 				if (unsupportedChoices.includes(chrCustomizationChoiceID))
 					name += '*';
 
-				choiceList.push({ id: chrCustomizationChoiceID, label: name });
+				choiceList.push({ id: chrCustomizationChoiceID, label: name, orderIndex: chrCustomizationChoiceRow.OrderIndex });
 			}
 
 			optionToChoices.set(chrCustomizationOptionID, choiceList);
@@ -210,9 +214,11 @@ export default async function (view) {
 	// Show the characters screen.
 	view.loadPct = -1;
 	view.isBusy--;
-	view.setScreen('tab-characters');
+	if (!skipScreen)
+		view.setScreen('tab-characters');
 
 	shared = {
+		chrCustGeosetDB,
 		chrModelIDToFileDataID,
 		chrModelIDToTextureLayoutID,
 		optionsByChrModel,
