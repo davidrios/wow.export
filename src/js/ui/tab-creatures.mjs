@@ -5,6 +5,8 @@ const BLPFile = require('../casc/blp');
 const ExportHelper = require('/js/casc/export-helper');
 const JSONWriter = require('/js/3D/writers/JSONWriter');
 const { getGeosetName } = require('/js/3D/GeosetMapper');
+const DBTextureFileData = require('/js/db/caches/DBTextureFileData');
+const DBModelFileData = require('/js/db/caches/DBModelFileData');
 
 import loadData from './creatures/game-data.mjs';
 import loadUiState from './creatures/ui-state.mjs';
@@ -125,12 +127,12 @@ export default {
 			return Object.fromEntries(npcItemSlotEntries.value.map(entry => [entry.ItemDisplayInfoID, d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID)]));
 		});
 
-		const enabledGeosets = computed(() => {
-			if (selectedData.value.creaturedisplayinfoextra == null)
+		function calculateEnabledGeosets(creaturedisplayinfoextra) {
+			if (creaturedisplayinfoextra == null)
 				return null;
 
-			const race = selectedData.value.creaturedisplayinfoextra.DisplayRaceID;
-			const sex = selectedData.value.creaturedisplayinfoextra.DisplaySexID;
+			const race = creaturedisplayinfoextra.DisplayRaceID;
+			const sex = creaturedisplayinfoextra.DisplaySexID;
 
 			const model = cd.chrRaceXChrModelMap.get(race).get(sex);
 			const availableOptions = cd.optionsByChrModel.get(model);
@@ -143,13 +145,14 @@ export default {
 					choices.get(option.customizationID).set(choice.orderIndex, choice);
 			}
 
-			// const face = choices.get(2).get(selectedData.value.creaturedisplayinfoextra.FaceID);
-			const hairStyle = choices.get(3).get(selectedData.value.creaturedisplayinfoextra.HairStyleID);
-			const features = choices.has(14) ? choices.get(14).get(selectedData.value.creaturedisplayinfoextra.FacialHairID) : null;
+			console.log(choices);
+			const hairStyle = choices.get(3).get(creaturedisplayinfoextra.HairStyleID);
+			const facialHair = choices.get(5)?.get(creaturedisplayinfoextra.FacialHairID);
+			const features = choices.get(14)?.get(creaturedisplayinfoextra.FacialHairID);
 
 			const enabled = [];
 
-			for (const opt of [hairStyle, features]) {
+			for (const opt of [hairStyle, facialHair, features]) {
 				if (opt == null)
 					continue;
 
@@ -190,7 +193,9 @@ export default {
 			}
 
 			return enabled;
-		})
+		}
+
+		const enabledGeosets = computed(() => calculateEnabledGeosets(selectedData.value.creaturedisplayinfoextra));
 
 		async function exportSelected() {
 			const id = selectedCreatureId.value;
@@ -215,18 +220,47 @@ export default {
 				const modeldata = d.creaturemodeldata.getRow(creaturedisplayinfo.ModelID);
 				const modelsounddata = d.creaturesounddata.getRow(modeldata.SoundID);
 
-				displayInfo[displayInfoId] = {
+				const itemSlots = {};
+				for (const entry of d.npcmodelitemslotdisplayinfomap.get(creaturedisplayinfoextra?.ID) ?? []) {
+					const displayInfo = d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID);
+
+					const ModelMaterialResourcesIDFileIDs = displayInfo.ModelMaterialResourcesID.map(
+						id => id === 0 ? id : DBTextureFileData.getTextureFDIDsByMatID(id)[0]);
+
+					const ModelResourcesIDFileIDs = displayInfo.ModelResourcesID.map(
+						id => id === 0 ? id : DBModelFileData.getModelFileDataID(id)[0]);
+
+					itemSlots[entry.ItemSlot] = {
+						...entry,
+						displayInfo: {
+							...displayInfo,
+							ModelMaterialResourcesIDFileIDs,
+							ModelMaterialResourcesIDFiles: ModelMaterialResourcesIDFileIDs.map(id => id > 0 ? addToExport(listfile.getByID(id)) : 0),
+							ModelResourcesIDFileIDs,
+							ModelResourcesIDFiles: ModelResourcesIDFileIDs.map(id => listfile.getByID(id)),
+						}
+					};
+				}
+
+				const locDisplayInfo = displayInfo[displayInfoId] = {
 					...creaturedisplayinfo,
 					TextureVariationFileData: creaturedisplayinfo.TextureVariationFileDataID
 						.filter(id => id !== 0)
 						.map(id => addToExport(listfile.getByID(id))),
-					extra: creaturedisplayinfoextra ?? {},
+					extra: {...creaturedisplayinfoextra},
+					itemSlots,
+					geosets: calculateEnabledGeosets(creaturedisplayinfoextra),
 					model: {
 						...modeldata,
 						FileData: listfile.getByID(modeldata.FileDataID),
 						sound: modelsounddata ?? {}
 					},
 				};
+
+				if (locDisplayInfo.extra.BakeMaterialResourcesID > 0) {
+					locDisplayInfo.extra.BakeMaterialResourcesIDFileID = DBTextureFileData.getTextureFDIDsByMatID(locDisplayInfo.extra.BakeMaterialResourcesID)[0];
+					locDisplayInfo.extra.BakeMaterialResourcesIDFile = addToExport(listfile.getByID(locDisplayInfo.extra.BakeMaterialResourcesIDFileID));
+				}
 
 				for (const name in view.config.creaturesSelectedSoundKitKeys) {
 					if (!view.config.creaturesSelectedSoundKitKeys[name] || modelsounddata == null || modelsounddata[name] == null)
