@@ -233,10 +233,10 @@ export default {
 					const displayInfo = d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID);
 
 					const ModelMaterialResourcesIDFileIDs = displayInfo.ModelMaterialResourcesID.map(
-						id => id === 0 ? id : DBTextureFileData.getTextureFDIDsByMatID(id)[0]);
+						(id, idx) => id === 0 ? id : DBTextureFileData.getTextureFDIDsByMatID(id)[idx]);
 
 					const ModelResourcesIDFileIDs = displayInfo.ModelResourcesID.map(
-						id => id === 0 ? id : DBModelFileData.getModelFileDataID(id)[0]);
+						(id, idx) => id === 0 ? id : DBModelFileData.getModelFileDataID(id)[idx]);
 
 					itemSlots[entry.ItemSlot] = {
 						...entry,

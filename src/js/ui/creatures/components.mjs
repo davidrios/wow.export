@@ -91,13 +91,13 @@ function getFormatter(table, col) {
 }
 
 const ModelResource = {
-	props: ['value'],
+	props: ['value', 'index'],
 	setup(props) {
 		const view = inject('view');
 
 		return {
 			item: computed(() => {
-				const id = DBModelFileData.getModelFileDataID(props.value)[0];
+				const id = DBModelFileData.getModelFileDataID(props.value)[props.index ?? 0];
 				const file = listfile.getByID(id);
 				return {
 					id,
@@ -128,21 +128,21 @@ const ModelResourceList = {
 	},
 	template: `
 		<ul>
-			<li v-for="item in items">
-				<model-resource :value="item"></model-resource>
+			<li v-for="item, index in items">
+				<model-resource :value="item" :index="index"></model-resource>
 			</li>
 		</ul>
 	`
 }
 
 const TextureResource = {
-	props: ['value'],
+	props: ['value', 'index'],
 	setup(props) {
 		const view = inject('view');
 
 		return {
 			item: computed(() => {
-				const id = DBTextureFileData.getTextureFDIDsByMatID(props.value)[0];
+				const id = DBTextureFileData.getTextureFDIDsByMatID(props.value)[props.index ?? 0];
 				const file = listfile.getByID(id);
 				return {
 					id,
@@ -173,8 +173,8 @@ const TextureResourceList = {
 	},
 	template: `
 		<ul>
-			<li v-for="item in items">
-				<texture-resource :value="item"></texture-resource>
+			<li v-for="item, index in items">
+				<texture-resource :value="item" :index="index"></texture-resource>
 			</li>
 		</ul>
 	`
