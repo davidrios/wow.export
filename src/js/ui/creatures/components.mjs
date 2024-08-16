@@ -147,7 +147,7 @@ const TextureResource = {
 				return {
 					id,
 					file,
-					name: path.basename(file),
+					name: file != null ? path.basename(file) : null,
 				}
 			}),
 			goToTexture(e, id) {
@@ -156,7 +156,7 @@ const TextureResource = {
 			}
 		}
 	},
-	template: `<a href="#" @click="goToTexture($event, item.id)" :title="item.file">{{ value }} [{{ item.name }}]</a>`
+	template: `<a v-if="item.file != null" href="#" @click="goToTexture($event, item.id)" :title="item.file">{{ value }} [{{ item.name }}]</a>`
 }
 
 const TextureResourceList = {
