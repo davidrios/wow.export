@@ -288,9 +288,9 @@ const getVariantTextureIDs = (fileName) => {
 	}
 };
 
-const exportFiles = async (files, isLocal = false, exportID = -1) => {
+const exportFiles = async (files, isLocal = false, exportID = -1, options = null) => {
 	const exportPaths = core.openLastExportStream();
-	const format = core.view.config.exportModelFormat;
+	const format = options?.format ?? core.view.config.exportModelFormat;
 
 	const manifest = { type: 'MODELS', exportID, succeeded: [], failed: [] };
 
@@ -324,8 +324,9 @@ const exportFiles = async (files, isLocal = false, exportID = -1) => {
 		}
 	} else {
 		const casc = core.view.casc;
-		const helper = new ExportHelper(files.length, 'model');
-		helper.start();
+		const helper = options?.helper ?? new ExportHelper(files.length, 'model');
+		if (options?.helper == null)
+			helper.start();
 
 		for (const fileEntry of files) {
 			// Abort if the export has been cancelled.
@@ -412,14 +413,14 @@ const exportFiles = async (files, isLocal = false, exportID = -1) => {
 						exportPath = ExportHelper.replaceExtension(exportPath, exportExtensions[format]);
 
 						if (fileType === MODEL_TYPE_M2) {
-							const exporter = new M2Exporter(data, getVariantTextureIDs(fileName), fileDataID);
+							const exporter = new M2Exporter(data, options?.variantTextureIDs ?? getVariantTextureIDs(fileName), fileDataID);
 
 							// Respect geoset masking for selected model.
 							if (fileName == activePath)
 								exporter.setGeosetMask(core.view.modelViewerGeosets);
 
 							if (format === 'OBJ') {
-								await exporter.exportAsOBJ(exportPath, core.view.config.modelsExportCollision, helper, fileManifest);
+								await exporter.exportAsOBJ(exportPath, core.view.config.modelsExportCollision, helper, fileManifest, options?.overwriteFiles);
 								await exportPaths?.writeLine('M2_OBJ:' + exportPath);
 							} else if (format === 'GLTF') {
 								await exporter.exportAsGLTF(exportPath, helper, fileManifest);
@@ -477,7 +478,8 @@ const exportFiles = async (files, isLocal = false, exportID = -1) => {
 			}
 		}
 
-		helper.finish();
+		if (options?.helper == null)
+			helper.finish();
 	}
 
 	// Write export information.
@@ -624,3 +626,7 @@ core.registerLoadFunc(async () => {
 		await exportFiles(userSelection, false);
 	});
 });
+
+module.exports = {
+	exportFiles
+}

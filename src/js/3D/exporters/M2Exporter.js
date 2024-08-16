@@ -383,7 +383,7 @@ class M2Exporter {
 	 * @param {ExportHelper} helper
 	 * @param {Array} fileManifest
 	 */
-	async exportAsOBJ(out, exportCollision = false, helper, fileManifest) {
+	async exportAsOBJ(out, exportCollision = false, helper, fileManifest, overrideOverwriteFiles = null) {
 		await this.m2.load();
 		const skin = await this.m2.getSkin(0);
 
@@ -447,7 +447,7 @@ class M2Exporter {
 			json.addProperty('boneWeights', this.m2.boneWeights);
 			json.addProperty('boneIndicies', this.m2.boneIndices);
 
-			await json.write(config.overwriteFiles);
+			await json.write(overrideOverwriteFiles ?? config.overwriteFiles);
 		}
 
 		if (exportMeta) {
@@ -503,7 +503,7 @@ class M2Exporter {
 				fileDataID: skin.fileDataID
 			});
 
-			await json.write(config.overwriteFiles);
+			await json.write(overrideOverwriteFiles ?? config.overwriteFiles);
 			fileManifest?.push({ type: 'META', fileDataID: this.fileDataID, file: json.out });
 		}
 
@@ -533,10 +533,10 @@ class M2Exporter {
 		if (!mtl.isEmpty)
 			obj.setMaterialLibrary(path.basename(mtl.out));
 
-		await obj.write(config.overwriteFiles);
+		await obj.write(overrideOverwriteFiles ?? config.overwriteFiles);
 		fileManifest?.push({ type: 'OBJ', fileDataID: this.fileDataID, file: obj.out });
 
-		await mtl.write(config.overwriteFiles);
+		await mtl.write(overrideOverwriteFiles ?? config.overwriteFiles);
 		fileManifest?.push({ type: 'MTL', fileDataID: this.fileDataID, file: mtl.out });
 
 		if (exportCollision) {
@@ -545,7 +545,7 @@ class M2Exporter {
 			phys.setNormalArray(this.m2.collisionNormals);
 			phys.addMesh('Collision', this.m2.collisionIndices);
 
-			await phys.write(config.overwriteFiles);
+			await phys.write(overrideOverwriteFiles ?? config.overwriteFiles);
 			fileManifest?.push({ type: 'PHYS_OBJ', fileDataID: this.fileDataID, file: phys.out });
 		}
 

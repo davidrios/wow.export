@@ -7,6 +7,7 @@ const JSONWriter = require('/js/3D/writers/JSONWriter');
 const { getGeosetName } = require('/js/3D/GeosetMapper');
 const DBTextureFileData = require('/js/db/caches/DBTextureFileData');
 const DBModelFileData = require('/js/db/caches/DBModelFileData');
+const TabModels = require('/js/ui/tab-models');
 
 import loadData from './creatures/game-data.mjs';
 import loadUiState from './creatures/ui-state.mjs';
@@ -215,6 +216,15 @@ export default {
 				return file;
 			}
 
+			const extraExportModels = new Map();
+			function addToExportModel(modelFile, textureID) {
+				if (!view.config.creaturesExportEquip || modelFile == null || textureID == null)
+					return modelFile;
+
+				extraExportModels.set(modelFile, textureID);
+				return modelFile;
+			}
+
 			const displayInfo = {};
 			const soundKits = {};
 
@@ -235,6 +245,12 @@ export default {
 					const ModelMaterialResourcesIDFileIDs = displayInfo.ModelMaterialResourcesID.map(
 						(id, idx) => id === 0 ? id : DBTextureFileData.getTextureFDIDsByMatID(id)[idx]);
 
+					// if other textures are blank, copy first texture if it exists
+					for (let i = 1; i < ModelMaterialResourcesIDFileIDs.length; i++) {
+						if (ModelMaterialResourcesIDFileIDs[i] == null && ModelMaterialResourcesIDFileIDs[0] > 0)
+							ModelMaterialResourcesIDFileIDs[i] = ModelMaterialResourcesIDFileIDs[0];
+					}
+
 					const ModelResourcesIDFileIDs = displayInfo.ModelResourcesID.map(
 						(id, idx) => id === 0 ? id : DBModelFileData.getModelFileDataID(id)[idx]);
 
@@ -245,7 +261,8 @@ export default {
 							ModelMaterialResourcesIDFileIDs,
 							ModelMaterialResourcesIDFiles: ModelMaterialResourcesIDFileIDs.map(id => id > 0 ? addToExport(listfile.getByID(id)) : 0),
 							ModelResourcesIDFileIDs,
-							ModelResourcesIDFiles: ModelResourcesIDFileIDs.map(id => listfile.getByID(id)),
+							ModelResourcesIDFiles: ModelResourcesIDFileIDs.map(
+								(id, idx) => addToExportModel(listfile.getByID(id), ModelMaterialResourcesIDFileIDs[idx])),
 						}
 					};
 				}
@@ -317,7 +334,7 @@ export default {
 				}
 			}
 
-			const helper = new ExportHelper(1 + extraExports.size, 'creature-data');
+			const helper = new ExportHelper(1 + extraExports.size + extraExportModels.size, 'creature-data');
 			helper.start();
 
 			const overwriteFiles = view.config.overwriteFiles;
@@ -346,6 +363,15 @@ export default {
 				}
 
 				helper.mark(file, true);
+			}
+
+			for (const [modelFile, textureFileID] of extraExportModels.entries()) {
+				await TabModels.exportFiles([modelFile], false, -1, {
+					helper,
+					format: 'OBJ',
+					variantTextureIDs: [textureFileID],
+					overwriteFiles: false
+				})
 			}
 
 			helper.finish();
@@ -431,6 +457,10 @@ export default {
 				</div>
 			</div>
 			<div class="preview-controls">
+				<label class="ui-checkbox">
+					<input type="checkbox" v-model="config.creaturesExportEquip" />
+					<span>Export equipment OBJ</span>
+				</label>
 				<input type="button" value="Export" @click="exportSelected" :class="{ disabled: isBusy || selectedData == null }" />
 			</div>
 		</div>
