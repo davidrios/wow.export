@@ -114,7 +114,7 @@ export default {
 		const soundKit = computed(() => d.soundkit.getRow(selectedSoundKit.value));
 		const soundKitEntries = computed(() => d.soundkitentrymap.get(selectedSoundKit.value));
 
-		const npcItemSlotEntries = computed(() => 
+		const npcItemSlotEntries = computed(() =>
 			selectedData.value.creaturedisplayinfoextra == null
 				? null
 				: d.npcmodelitemslotdisplayinfomap.get(selectedData.value.creaturedisplayinfoextra.ID)
@@ -127,10 +127,7 @@ export default {
 			return Object.fromEntries(npcItemSlotEntries.value.map(entry => [entry.ItemDisplayInfoID, d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID)]));
 		});
 
-		function calculateEnabledGeosets(creaturedisplayinfoextra) {
-			if (creaturedisplayinfoextra == null)
-				return null;
-
+		function getCustChoices(creaturedisplayinfoextra) {
 			const race = creaturedisplayinfoextra.DisplayRaceID;
 			const sex = creaturedisplayinfoextra.DisplaySexID;
 
@@ -145,14 +142,23 @@ export default {
 					choices.get(option.customizationID).set(choice.orderIndex, choice);
 			}
 
-			console.log(choices);
-			const hairStyle = choices.get(3)?.get(creaturedisplayinfoextra.HairStyleID);
-			const facialHair = choices.get(5)?.get(creaturedisplayinfoextra.FacialHairID);
-			const features = choices.get(14)?.get(creaturedisplayinfoextra.FacialHairID);
+			return {
+				hairStyle: choices.get(3)?.get(creaturedisplayinfoextra.HairStyleID),
+				hairColor: choices.get(4)?.get(creaturedisplayinfoextra.HairColorID),
+				facialHair: choices.get(5)?.get(creaturedisplayinfoextra.FacialHairID),
+				features: choices.get(14)?.get(creaturedisplayinfoextra.FacialHairID),
+			}
+		}
+
+		function calculateEnabledGeosets(creaturedisplayinfoextra) {
+			if (creaturedisplayinfoextra == null)
+				return null;
+
+			const custChoices = getCustChoices(creaturedisplayinfoextra);
 
 			const enabled = [];
 
-			for (const opt of [hairStyle, facialHair, features]) {
+			for (const opt of [custChoices.hairStyle, custChoices.facialHair, custChoices.features]) {
 				if (opt == null)
 					continue;
 
@@ -265,10 +271,27 @@ export default {
 				}
 
 				if (locDisplayInfo.extra.HairColorID != null) {
-					const clientFile = cd.chrRaceMap.get(locDisplayInfo.extra.DisplayRaceID).clientFile;
-					const fileName = `character/${clientFile.toLowerCase()}/hair00_${locDisplayInfo.extra.HairColorID.toString().padStart(2, 0)}.blp`;
-					locDisplayInfo.extra.HairTextureFileID = listfile.getByFilename(fileName);
-					locDisplayInfo.extra.HairTextureFile = addToExport(fileName);
+					const custChoices = getCustChoices(creaturedisplayinfoextra);
+
+					let hairTextureFile = cd.choiceToChrCustMaterialID.get(custChoices.hairStyle.id)
+						?.filter(item => item.RelatedChrCustomizationChoiceID === custChoices.hairColor.id)
+						.map(item => listfile.getByID(cd.chrCustMatMap.get(item.ChrCustomizationMaterialID).FileDataID))
+						.find(fileName => fileName.includes('/hair0'));
+
+					let hairTextureID = hairTextureFile != null ? listfile.getByFilename(hairTextureFile) : null;
+
+					if (hairTextureFile == null) {
+						const hairColorMat = cd.choiceToChrCustMaterialID.get(custChoices.hairColor.id);
+						if (hairColorMat != null) {
+							hairTextureID = cd.chrCustMatMap.get(hairColorMat[0]?.ChrCustomizationMaterialID)?.FileDataID;
+							hairTextureFile = listfile.getByID(hairTextureID);
+						}
+					}
+
+					if (hairTextureFile != null) {
+						locDisplayInfo.extra.HairTextureFileID = hairTextureID;
+						locDisplayInfo.extra.HairTextureFile = addToExport(hairTextureFile);
+					}
 				}
 
 				for (const name in view.config.creaturesSelectedSoundKitKeys) {
