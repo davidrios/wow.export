@@ -264,6 +264,13 @@ export default {
 					locDisplayInfo.extra.BakeMaterialResourcesIDFile = addToExport(listfile.getByID(locDisplayInfo.extra.BakeMaterialResourcesIDFileID));
 				}
 
+				if (locDisplayInfo.extra.HairColorID != null) {
+					const clientFile = cd.chrRaceMap.get(locDisplayInfo.extra.DisplayRaceID).clientFile;
+					const fileName = `character/${clientFile.toLowerCase()}/hair00_${locDisplayInfo.extra.HairColorID.toString().padStart(2, 0)}.blp`;
+					locDisplayInfo.extra.HairTextureFileID = listfile.getByFilename(fileName);
+					locDisplayInfo.extra.HairTextureFile = addToExport(fileName);
+				}
+
 				for (const name in view.config.creaturesSelectedSoundKitKeys) {
 					if (!view.config.creaturesSelectedSoundKitKeys[name] || modelsounddata == null || modelsounddata[name] == null)
 						continue;

@@ -157,7 +157,12 @@ export default async function (view, skipScreen) {
 
 	for (const [chrRaceID, chrRaceRow] of chrRacesDB.getAllRows()) {
 		const flags = chrRaceRow.Flags;
-		chrRaceMap.set(chrRaceID, { id: chrRaceID, name: chrRaceRow.Name_lang, isNPCRace: ((flags & 1) == 1 && chrRaceID != 23 && chrRaceID != 75) });
+		chrRaceMap.set(chrRaceID, {
+			id: chrRaceID,
+			name: chrRaceRow.Name_lang,
+			isNPCRace: ((flags & 1) == 1 && chrRaceID != 23 && chrRaceID != 75),
+			clientFile: chrRaceRow.ClientFileString
+		});
 	}
 
 	await progress.step('Loading character race models..');
