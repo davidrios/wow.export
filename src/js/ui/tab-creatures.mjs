@@ -146,7 +146,7 @@ export default {
 			}
 
 			console.log(choices);
-			const hairStyle = choices.get(3).get(creaturedisplayinfoextra.HairStyleID);
+			const hairStyle = choices.get(3)?.get(creaturedisplayinfoextra.HairStyleID);
 			const facialHair = choices.get(5)?.get(creaturedisplayinfoextra.FacialHairID);
 			const features = choices.get(14)?.get(creaturedisplayinfoextra.FacialHairID);
 
@@ -204,6 +204,8 @@ export default {
 			const extraExports = new Set();
 			function addToExport(file) {
 				extraExports.add(file);
+				if (file.endsWith('.blp'))
+					file = file.replace(/\.blp$/, '.png');
 				return file;
 			}
 
