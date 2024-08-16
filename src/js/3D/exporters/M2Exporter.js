@@ -202,7 +202,19 @@ class M2Exporter {
 		return validTextures;
 	}
 
-	async exportAsGLTF(out, helper) {
+	async exportAttachments(out, helper, fileManifest) {
+		if (!core.view.config.exportM2Attachments || this.m2.attachments.length === 0)
+			return;
+
+		const json = new JSONWriter(ExportHelper.replaceExtension(out, '_attachments.json'));
+		log.write('Exporting M2 attachments for %s as JSON: %s', path.basename(json.out, '.json'), json.out);
+		json.addProperty('attachments', this.m2.attachments);
+
+		await json.write(core.view.config.overwriteFiles);
+		fileManifest?.push({ type: 'ATTACHMENT', fileDataID: this.fileDataID, file: json.out });
+	}
+
+	async exportAsGLTF(out, helper, fileManifest) {
 		const outGLTF = ExportHelper.replaceExtension(out, '.gltf');
 		const outDir = path.dirname(out);
 
@@ -359,6 +371,9 @@ class M2Exporter {
 		}
 
 		await gltf.write(core.view.config.overwriteFiles);
+		fileManifest?.push({ type: 'GLTF', fileDataID: this.fileDataID, file: outGLTF });
+
+		await this.exportAttachments(out, helper, fileManifest);
 	}
 
 	/**
@@ -533,6 +548,8 @@ class M2Exporter {
 			await phys.write(config.overwriteFiles);
 			fileManifest?.push({ type: 'PHYS_OBJ', fileDataID: this.fileDataID, file: phys.out });
 		}
+
+		await this.exportAttachments(out, helper, fileManifest);
 	}
 
 	/**

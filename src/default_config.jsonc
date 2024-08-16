@@ -39,6 +39,7 @@
 	"overwriteFiles": true,
 	"exportM2Bones": false,
 	"exportM2Meta": false,
+	"exportM2Attachments": false,
 	"exportWMOMeta": false,
 	"exportBLPMeta": false,
 	"exportFoliageMeta": false,
