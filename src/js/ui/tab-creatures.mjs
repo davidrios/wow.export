@@ -201,7 +201,7 @@ export default {
 			const chestSlot = itemBySlot.get(5);
 			if (chestSlot != null) {
 				if (chestSlot.GeosetGroup[0] > 0)
-					enabled.push(`Pants${chestSlot.GeosetGroup[0] + 1}`);
+					enabled.push(`Tabard${chestSlot.GeosetGroup[0] + 1}`);
 
 				if (chestSlot.GeosetGroup[2] > 0) {
 					enabled.push(`Trousers${chestSlot.GeosetGroup[2] + 1}`);
