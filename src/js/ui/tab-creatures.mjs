@@ -198,10 +198,13 @@ export default {
 					enabled.push(`Wrist${itemBySlot.get(2).GeosetGroup[0] + 1}`);
 			}
 
-			if (itemBySlot.has(5)) {
-				const chest = itemBySlot.get(5);
-				if (chest.GeosetGroup[2] > 0) {
-					enabled.push(`Trousers${chest.GeosetGroup[2] + 1}`);
+			const chestSlot = itemBySlot.get(5);
+			if (chestSlot != null) {
+				if (chestSlot.GeosetGroup[0] > 0)
+					enabled.push(`Pants${chestSlot.GeosetGroup[0] + 1}`);
+
+				if (chestSlot.GeosetGroup[2] > 0) {
+					enabled.push(`Trousers${chestSlot.GeosetGroup[2] + 1}`);
 					enabled.push('-Boots1');
 				}
 			}
