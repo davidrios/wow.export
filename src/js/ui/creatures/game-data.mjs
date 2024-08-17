@@ -15,7 +15,7 @@ export default async function (view) {
 		.concat(listfile.getFilteredEntries(/\/(modelfiledata|soundkit|soundkitentry|npcmodelitemslotdisplayinfo|itemdisplayinfo)\.db2/));
 
 	// Initialize a loading screen.
-	const progress = core.createProgress(loadedDbs.length + 2);
+	const progress = core.createProgress(loadedDbs.length + 3);
 	view.setScreen('loading');
 	view.isBusy++;
 
@@ -61,11 +61,32 @@ export default async function (view) {
 
 		await progress.step('Loading creature template JSON...');
 		allTables.creaturetemplate = new Map();
-		if (view.config.creatureTemplateJSON.length > 0) {
-			const templateDbData = await generics.readJSON(view.config.creatureTemplateJSON);
+		if (view.config.creatureJSONTablesDir.length > 0) {
+			const templateDbData = await generics.readJSON(path.join(view.config.creatureJSONTablesDir, 'creature_template.json'));
 			templateDbData.sort((a, b) => a.name.localeCompare(b.name));
 			for (const entry of templateDbData)
 				allTables.creaturetemplate.set(entry.entry, {id: entry.entry, ...entry});
+		}
+
+		await progress.step('Loading creature equip template JSON...');
+		allTables.creatureequiptemplate = new Map();
+		if (view.config.creatureJSONTablesDir.length > 0) {
+			const itemData = await generics.readJSON(path.join(view.config.creatureJSONTablesDir, 'item_template.json'));
+			const itemDataMap = new Map();
+			for (const entry of itemData)
+				itemDataMap.set(entry.entry, entry);
+
+			const templateDbData = await generics.readJSON(path.join(view.config.creatureJSONTablesDir, 'creature_equip_template.json'));
+			for (const entry of templateDbData) {
+				allTables.creatureequiptemplate.set(entry.CreatureID, {
+					...entry,
+					items: [
+						{...itemDataMap.get(entry.ItemID1), index: 1},
+						{...itemDataMap.get(entry.ItemID2), index: 2},
+						{...itemDataMap.get(entry.ItemID3), index: 3},
+					]
+				});
+			}
 		}
 
 		shared = allTables;

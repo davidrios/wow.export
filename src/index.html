@@ -362,9 +362,9 @@
 						<input type="text" v-model.trim="configEdit.lastExportFile" :placeholder="lastExportPathDefault" class="long"/>
 					</div>
 					<div>
-						<h1>Creature Template JSON</h1>
-						<p>JSON containing creature_template database from acore</p>
-						<file-field v-model="configEdit.creatureTemplateJSON"></file-field>
+						<h1>Creature JSON Tables Directory</h1>
+						<p>Directory containing JSON tables taken from acore database</p>
+						<file-field v-model="configEdit.creatureJSONTablesDir" type="directory"></file-field>
 					</div>
 				</div>
 				<div id="toast" v-if="toast" :class="toast.type">

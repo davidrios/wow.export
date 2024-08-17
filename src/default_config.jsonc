@@ -89,5 +89,5 @@
 	"rcpEnabled": false,
 	"rcpPort": 17751,
 	"lastExportFile": "",
-	"creatureTemplateJSON": ""
+	"creatureJSONTablesDir": ""
 }

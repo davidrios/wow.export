@@ -16,6 +16,14 @@ import loadCharacterData from './characters/game-data.mjs';
 
 const { ref, computed, inject, provide } = Vue;
 
+function objFilterFields(obj, fields, isBlacklist) {
+	fields = new Set(fields);
+	return Object.fromEntries(
+		Object.entries(obj)
+			.filter(([key]) => isBlacklist ? !fields.has(key) : fields.has(key))
+	);
+}
+
 export default {
 	components: { TableDisplay },
 	setup() {
@@ -87,6 +95,11 @@ export default {
 			if (info == null)
 				return null;
 
+			var equiptemplate = d.creatureequiptemplate.get(info.entry) ?? {};
+			const items = equiptemplate.items
+				?.filter(item => item.displayid != null)
+				.map(item => objFilterFields(item, ['entry', 'class', 'subclass', 'name', 'displayid', 'Material', 'sheath', 'index'])) ?? [];
+
 			const creaturedisplayinfo = d.creaturedisplayinfo.getRow(selectedDisplayInfo.value ?? info.modelid1);
 			if (creaturedisplayinfo == null)
 				return null;
@@ -96,7 +109,8 @@ export default {
 			const modeldata = d.creaturemodeldata.getRow(creaturedisplayinfo.ModelID);
 			const sounddata = d.creaturesounddata.getRow(modeldata.SoundID);
 			return {
-				info,
+				info: objFilterFields(info, ['entry', 'modelid1', 'modelid2', 'modelid3', 'modelid4', 'name', 'subname', 'scale', 'unity_class', 'MovementType']),
+				items,
 				creaturedisplayinfo,
 				creaturedisplayinfoextra,
 				modeldata,
@@ -125,7 +139,10 @@ export default {
 			if (npcItemSlotEntries.value == null)
 				return null;
 
-			return Object.fromEntries(npcItemSlotEntries.value.map(entry => [entry.ItemDisplayInfoID, d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID)]));
+			return Object.fromEntries(npcItemSlotEntries.value
+				.map(entry => [entry.ItemDisplayInfoID, d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID)])
+				.concat(selectedData.value.items.map(entry => [entry.displayid, d.itemdisplayinfo.getRow(entry.displayid)]))
+			);
 		});
 
 		function getCustChoices(creaturedisplayinfoextra) {
@@ -228,6 +245,15 @@ export default {
 			const displayInfo = {};
 			const soundKits = {};
 
+			var equiptemplate = d.creatureequiptemplate.get(id) ?? {};
+			const equipItems = equiptemplate.items
+				?.filter(item => item.displayid != null)
+				.map(item => ({
+					...item,
+					ItemDisplayInfoID: item.displayid,
+					ItemSlot: item.class + 100,
+				})) ?? [];
+
 			for (let i = 1; i <= 4; i++) {
 				const displayInfoId = data.info[`modelid${i}`];
 				const creaturedisplayinfo = d.creaturedisplayinfo.getRow(displayInfoId);
@@ -239,7 +265,9 @@ export default {
 				const modelsounddata = d.creaturesounddata.getRow(modeldata.SoundID);
 
 				const itemSlots = {};
-				for (const entry of d.npcmodelitemslotdisplayinfomap.get(creaturedisplayinfoextra?.ID) ?? []) {
+				const itemEntries = equipItems.concat(d.npcmodelitemslotdisplayinfomap.get(creaturedisplayinfoextra?.ID) ?? []);
+
+				for (const entry of itemEntries) {
 					const displayInfo = d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID);
 
 					const ModelMaterialResourcesIDFileIDs = displayInfo.ModelMaterialResourcesID.map(
@@ -409,6 +437,16 @@ export default {
 				<div>
 					<h3>Info</h3>
 					<table-display type='info' :data="selectedData.info"></table-display>
+
+					<div>
+						<h3>Equipped Items</h3>
+						<ul class="table-entries">
+							<li v-for="entry in selectedData.items">
+								<table-display type='items' :data="entry"></table-display>
+								<table-display type='itemdisplayinfo' :data="itemDisplayInfo[entry.displayid]"></table-display>
+							</li>
+						</ul>
+					</div>
 				</div>
 				<div>
 					<h3>DisplayInfo</h3>
@@ -433,8 +471,10 @@ export default {
 					<h3>ModelData</h3>
 					<table-display type='modeldata' :data="selectedData.modeldata"></table-display>
 
-					<h3>Enabled Geosets</h3>
-					<div>{{ enabledGeosets }}</div>
+					<div>
+						<h3>Enabled Geosets</h3>
+						<div>{{ enabledGeosets }}</div>
+					</div>
 				</div>
 				<div>
 					<h3>SoundData</h3>
