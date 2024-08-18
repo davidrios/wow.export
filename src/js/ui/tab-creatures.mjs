@@ -304,7 +304,7 @@ export default {
 					TextureVariationFileData: creaturedisplayinfo.TextureVariationFileDataID
 						.filter(id => id !== 0)
 						.map(id => addToExport(listfile.getByID(id))),
-					extra: {...creaturedisplayinfoextra},
+					extra: creaturedisplayinfoextra != null ? {...creaturedisplayinfoextra} : null,
 					itemSlots,
 					geosets: calculateEnabledGeosets(creaturedisplayinfoextra),
 					model: {
@@ -314,12 +314,12 @@ export default {
 					},
 				};
 
-				if (locDisplayInfo.extra.BakeMaterialResourcesID > 0) {
-					locDisplayInfo.extra.BakeMaterialResourcesIDFileID = DBTextureFileData.getTextureFDIDsByMatID(locDisplayInfo.extra.BakeMaterialResourcesID)[0];
-					locDisplayInfo.extra.BakeMaterialResourcesIDFile = addToExport(listfile.getByID(locDisplayInfo.extra.BakeMaterialResourcesIDFileID));
-				}
-
 				if (creaturedisplayinfoextra != null) {
+					if (locDisplayInfo.extra.BakeMaterialResourcesID > 0) {
+						locDisplayInfo.extra.BakeMaterialResourcesIDFileID = DBTextureFileData.getTextureFDIDsByMatID(locDisplayInfo.extra.BakeMaterialResourcesID)[0];
+						locDisplayInfo.extra.BakeMaterialResourcesIDFile = addToExport(listfile.getByID(locDisplayInfo.extra.BakeMaterialResourcesIDFileID));
+					}
+
 					const custChoices = new Map(Array.from(getCustChoices(creaturedisplayinfoextra).values()).map(entry => [entry.id, entry]));
 
 					let hairTextureFile;
