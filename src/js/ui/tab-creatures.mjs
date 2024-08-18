@@ -251,7 +251,7 @@ export default {
 
 			var equiptemplate = d.creatureequiptemplate.get(id) ?? {};
 			const equipItems = equiptemplate.items
-				?.filter(item => item.displayid != null)
+				?.filter(item => item.displayid != null && !(item.class === 2 && item.subclass === 18))
 				.map(item => ({
 					...item,
 					ItemDisplayInfoID: item.displayid,
