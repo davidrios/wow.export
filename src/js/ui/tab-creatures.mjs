@@ -136,13 +136,14 @@ export default {
 		);
 
 		const itemDisplayInfo = computed(() => {
-			if (npcItemSlotEntries.value == null)
-				return null;
+			const equipMap = {};
+			for (const entry of selectedData.value?.items ?? [])
+				equipMap[entry.displayid] = d.itemdisplayinfo.getRow(entry.displayid);
 
-			return Object.fromEntries(npcItemSlotEntries.value
-				.map(entry => [entry.ItemDisplayInfoID, d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID)])
-				.concat(selectedData.value.items.map(entry => [entry.displayid, d.itemdisplayinfo.getRow(entry.displayid)]))
-			);
+			for (const entry of npcItemSlotEntries.value ?? [])
+				equipMap[entry.ItemDisplayInfoID] = d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID);
+
+			return equipMap;
 		});
 
 		function getCustChoices(creaturedisplayinfoextra) {
@@ -318,7 +319,7 @@ export default {
 					locDisplayInfo.extra.BakeMaterialResourcesIDFile = addToExport(listfile.getByID(locDisplayInfo.extra.BakeMaterialResourcesIDFileID));
 				}
 
-				if (locDisplayInfo.extra != null) {
+				if (creaturedisplayinfoextra != null) {
 					const custChoices = new Map(Array.from(getCustChoices(creaturedisplayinfoextra).values()).map(entry => [entry.id, entry]));
 
 					let hairTextureFile;
