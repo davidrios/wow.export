@@ -67,8 +67,11 @@ export default async function (view, skipScreen) {
 	await chrCustElementDB.parse();
 
 	for (const chrCustomizationElementRow of chrCustElementDB.getAllRows().values()) {
-		if (chrCustomizationElementRow.ChrCustomizationGeosetID != 0)
-			choiceToGeoset.set(chrCustomizationElementRow.ChrCustomizationChoiceID, chrCustomizationElementRow.ChrCustomizationGeosetID);
+		if (chrCustomizationElementRow.ChrCustomizationGeosetID != 0) {
+			const geosets = choiceToGeoset.get(chrCustomizationElementRow.ChrCustomizationChoiceID) ?? [];
+			geosets.push(chrCustomizationElementRow.ChrCustomizationGeosetID);
+			choiceToGeoset.set(chrCustomizationElementRow.ChrCustomizationChoiceID, geosets);
+		}
 
 		if (chrCustomizationElementRow.ChrCustomizationSkinnedModelID != 0) {
 			choiceToSkinnedModel.set(chrCustomizationElementRow.ChrCustomizationChoiceID, chrCustomizationElementRow.ChrCustomizationSkinnedModelID);

@@ -132,19 +132,20 @@ export default {
 				const availableChoices = d.optionToChoices.get(optionID);
 
 				for (const availableChoice of availableChoices) {
-					const chrCustGeoID = d.choiceToGeoset.get(availableChoice.id);
-					const geoset = d.geosetMap.get(chrCustGeoID);
+					for (const chrCustGeoID of d.choiceToGeoset.get(availableChoice.id) ?? []) {
+						const geoset = d.geosetMap.get(chrCustGeoID);
 
-					if (geoset !== undefined) {
-						for (const availableGeoset of chrCustGeosets.value) {
-							// HACK: Never touch geoset 0 (base skin)
-							if (availableGeoset.id == 0)
-								continue;
+						if (geoset !== undefined) {
+							for (const availableGeoset of chrCustGeosets.value) {
+								// HACK: Never touch geoset 0 (base skin)
+								if (availableGeoset.id == 0)
+									continue;
 
-							if (availableGeoset.id === geoset) {
-								let shouldBeChecked = availableChoice.id == choiceID;
-								if (availableGeoset.checked != shouldBeChecked)
-									availableGeoset.checked = shouldBeChecked;
+								if (availableGeoset.id === geoset) {
+									let shouldBeChecked = availableChoice.id == choiceID;
+									if (availableGeoset.checked != shouldBeChecked)
+										availableGeoset.checked = shouldBeChecked;
+								}
 							}
 						}
 					}

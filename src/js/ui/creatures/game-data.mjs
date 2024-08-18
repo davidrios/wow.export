@@ -11,7 +11,7 @@ export default async function (view) {
 	if (shared !== undefined)
 		return shared;
 
-	const loadedDbs = listfile.getFilteredEntries(/\/creature(displayinfo(extra)?|modeldata|sounddata)\.db2/)
+	const loadedDbs = listfile.getFilteredEntries(/\/creature(displayinfo(extra|option)?|modeldata|sounddata)\.db2/)
 		.concat(listfile.getFilteredEntries(/\/(modelfiledata|soundkit|soundkitentry|npcmodelitemslotdisplayinfo|itemdisplayinfo)\.db2/));
 
 	// Initialize a loading screen.
@@ -42,6 +42,14 @@ export default async function (view) {
 				console.error('Couldnt load table', file.fileName, e);
 			}
 		}
+
+		const creaturedisplayinfooptionmap = new Map();
+		for (const entry of allTables.creaturedisplayinfooption.rows.values()) {
+			if (!creaturedisplayinfooptionmap.has(entry.CreatureDisplayInfoExtraID))
+				creaturedisplayinfooptionmap.set(entry.CreatureDisplayInfoExtraID, []);
+			creaturedisplayinfooptionmap.get(entry.CreatureDisplayInfoExtraID).push(entry);
+		}
+		allTables.creaturedisplayinfooptionmap = creaturedisplayinfooptionmap;
 
 		const soundkitentrymap = new Map();
 		for (const entry of allTables.soundkitentry?.rows.values() ?? []) {

@@ -148,24 +148,29 @@ export default {
 		function getCustChoices(creaturedisplayinfoextra) {
 			const race = creaturedisplayinfoextra.DisplayRaceID;
 			const sex = creaturedisplayinfoextra.DisplaySexID;
+			const chosenOptions = new Map(
+				d.creaturedisplayinfooptionmap.get(creaturedisplayinfoextra.ID)
+					.map(entry => [entry.ChrCustomizationOptionID, entry.ChrCustomizationChoiceID])
+			);
 
 			const model = cd.chrRaceXChrModelMap.get(race).get(sex);
 			const availableOptions = cd.optionsByChrModel.get(model);
-			const choices = new Map();
+			const allChoices = new Map();
 			for (const option of availableOptions) {
-				if (!choices.has(option.customizationID))
-					choices.set(option.customizationID, new Map());
+				if (!allChoices.has(option.id))
+					allChoices.set(option.id, new Map());
 
 				for (const choice of cd.optionToChoices.get(option.id))
-					choices.get(option.customizationID).set(choice.orderIndex, choice);
+					allChoices.get(option.id).set(choice.id, {...choice, customizationID: option.customizationID});
 			}
 
-			return {
-				hairStyle: choices.get(3)?.get(creaturedisplayinfoextra.HairStyleID),
-				hairColor: choices.get(4)?.get(creaturedisplayinfoextra.HairColorID),
-				facialHair: choices.get(5)?.get(creaturedisplayinfoextra.FacialHairID),
-				features: choices.get(14)?.get(creaturedisplayinfoextra.FacialHairID),
+			const ret = new Map();
+			for (const [optionID, choice] of chosenOptions.entries()) {
+				const choiceVal = allChoices.get(optionID).get(choice);
+				ret.set(choiceVal.customizationID, {...choiceVal, optionID});
 			}
+
+			return ret;
 		}
 
 		function calculateEnabledGeosets(creaturedisplayinfoextra) {
@@ -176,17 +181,12 @@ export default {
 
 			const enabled = [];
 
-			for (const opt of [custChoices.hairStyle, custChoices.facialHair, custChoices.features]) {
-				if (opt == null)
-					continue;
-
-				const chrCustGeoID = cd.choiceToGeoset.get(opt.id);
-				let geoset = cd.geosetMap.get(chrCustGeoID);
-				if (geoset >= 200 && geoset < 300)
-					geoset = geoset - 98;
-
-				enabled.push(getGeosetName(geoset, geoset));
-				console.log(chrCustGeoID, geoset, getGeosetName(geoset, geoset));
+			for (const choice of custChoices.values()) {
+				for (const chrCustGeoID of cd.choiceToGeoset.get(choice.id) ?? []) {
+					const geoset = cd.geosetMap.get(chrCustGeoID);
+					if (geoset != null)
+						enabled.push(getGeosetName(geoset, geoset));
+				}
 			}
 
 			const itemBySlot = new Map();
@@ -318,21 +318,23 @@ export default {
 					locDisplayInfo.extra.BakeMaterialResourcesIDFile = addToExport(listfile.getByID(locDisplayInfo.extra.BakeMaterialResourcesIDFileID));
 				}
 
-				if (locDisplayInfo.extra.HairColorID != null) {
-					const custChoices = getCustChoices(creaturedisplayinfoextra);
+				if (locDisplayInfo.extra != null) {
+					const custChoices = new Map(Array.from(getCustChoices(creaturedisplayinfoextra).values()).map(entry => [entry.id, entry]));
 
-					let hairTextureFile = cd.choiceToChrCustMaterialID.get(custChoices.hairStyle.id)
-						?.filter(item => item.RelatedChrCustomizationChoiceID === custChoices.hairColor.id)
-						.map(item => listfile.getByID(cd.chrCustMatMap.get(item.ChrCustomizationMaterialID).FileDataID))
-						.find(fileName => fileName.includes('/hair0'));
+					let hairTextureFile;
+					let hairTextureID;
 
-					let hairTextureID = hairTextureFile != null ? listfile.getByFilename(hairTextureFile) : null;
+					for (const custChoice of custChoices.values()) {
+						for (const custMat of cd.choiceToChrCustMaterialID.get(custChoice.id) ?? []) {
+							const related = custChoices.get(custMat.RelatedChrCustomizationChoiceID);
+							if (related == null)
+								continue;
 
-					if (hairTextureFile == null) {
-						const hairColorMat = cd.choiceToChrCustMaterialID.get(custChoices.hairColor.id);
-						if (hairColorMat != null) {
-							hairTextureID = cd.chrCustMatMap.get(hairColorMat[0]?.ChrCustomizationMaterialID)?.FileDataID;
-							hairTextureFile = listfile.getByID(hairTextureID);
+							const textureName = listfile.getByID(cd.chrCustMatMap.get(custMat.ChrCustomizationMaterialID).FileDataID);
+							if (textureName.includes('/hair0')) {
+								hairTextureFile = textureName;
+								hairTextureID = listfile.getByFilename(textureName);
+							}
 						}
 					}
 
