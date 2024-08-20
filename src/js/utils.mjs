@@ -1,6 +1,7 @@
 const path = require('path');
 const fsp = require('fs').promises;
 
+const listfile = require('./casc/listfile');
 const { exportFiles } = require('./ui/tab-textures');
 
 const collectFiles = async (dir, out = []) => {
@@ -22,7 +23,8 @@ export async function reexportTextures(view) {
 
 	const exportedTextures = (await collectFiles(view.config.exportDirectory))
 		.filter(item => item.endsWith('.png'))
-		.map(item => item.substring(view.config.exportDirectory.length + 1).replace('.png', '.blp'));
+		.map(item => item.substring(view.config.exportDirectory.length + 1).replace('.png', '.blp'))
+		.filter(item => listfile.getByFilename(item) != null);
 
 	exportFiles(exportedTextures, false, -1, false);
 }
