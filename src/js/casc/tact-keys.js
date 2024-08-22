@@ -3,11 +3,14 @@
 	Authors: Kruithne <kruithne@gmail.com>
 	License: MIT
  */
-const log = require('../log');
 const fsp = require('fs').promises;
+const path = require('path');
+const log = require('../log');
 const generics = require('../generics');
 const constants = require('../constants');
 const core = require('../core');
+const WDCReader = require('../db/WDCReader');
+const BufferWrapper = require('../buffer');
 
 const KEY_RING = {};
 let isSaving = false;
@@ -134,4 +137,84 @@ const doSave = async () => {
 	isSaving = false;
 };
 
-module.exports = { load, getKey, addKey };
+const formatToHex = (arr) => arr.map(i => i.toString(16).padStart(2, '0')).join('');
+
+const printMissingFromDB = async () => {
+	const keyDB = new WDCReader('DBFilesClient/TactKey.db2');
+	await keyDB.parse();
+
+	const lookup = new WDCReader('DBFilesClient/TactKeyLookup.db2');
+	await lookup.parse();
+
+	const newKeys = [];
+	const unknownIds = new Set();
+
+	for (const row of lookup.rows.values()) {
+		const name = formatToHex(row.TACTID.reverse());
+		if (KEY_RING[name] != null)
+			continue;
+
+		const keyRow = keyDB.getRow(row.ID);
+		if (keyRow == null) {
+			unknownIds.add(row.ID);
+			continue;
+		}
+
+		const key = formatToHex(keyDB.getRow(row.ID).Key);
+		newKeys.push(`${name.toUpperCase()} ${key.toUpperCase()}`);
+	}
+
+	const casc = core.view.casc
+	if (unknownIds.size > 0 && casc.dataDir != null) {
+		newKeys.push('');
+
+		const versionDataDir = {
+			wow: '_retail_',
+			wow_classic: '_classic_',
+			wow_classic_era: '_classic_era_',
+		}[casc.build.Product];
+
+		try {
+			const dbCacheFile = path.join(path.dirname(casc.dataDir), versionDataDir, 'Cache', 'ADB', core.view.selectedLocaleKey, 'DBCache.bin');
+			const data = await fsp.readFile(dbCacheFile);
+
+			const buf = BufferWrapper.from(data);
+			const magic = buf.readUInt32LE();
+			if (magic !== 0x48544658)
+				throw new Error('invalid magic');
+
+			const version = buf.readUInt32LE();
+			if (version !== 9)
+				throw new Error('unsupported version');
+
+			buf.move(4); // build id
+			buf.move(32); // hash
+
+			while (buf.remainingBytes > 0) {
+				buf.move(4); // magic
+				buf.move(4); // region_id
+				buf.move(4); // index
+				buf.move(4); // unique_id
+				const tblHash = buf.readUInt32LE();
+				const recId = buf.readUInt32LE();
+				const size = buf.readUInt32LE();
+				buf.move(1); // status
+				buf.move(3); // pad
+
+				if (tblHash === 0xdf2f53cf && unknownIds.has(recId) && size === 16) {
+					const name = formatToHex(lookup.rows.get(recId).TACTID.reverse());
+					const key = formatToHex(buf.readUInt8(size));
+					newKeys.push(`${name.toUpperCase()} ${key.toUpperCase()}`);
+				} else {
+					buf.move(size);
+				}
+			}
+		} catch (e) {
+			console.warn('Could not read cache file', e);
+		}
+	}
+
+	console.log(newKeys.join('\n'));
+}
+
+module.exports = { load, getKey, addKey, printMissingFromDB };
