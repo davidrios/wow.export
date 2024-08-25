@@ -220,6 +220,11 @@ export default {
 					enabled.push(`Gloves${itemBySlot.get(8).GeosetGroup[0] + 1}`);
 			}
 
+			if (itemBySlot.has(9)) {
+				if (itemBySlot.get(9).GeosetGroup[0] > 0)
+					enabled.push(`Tabard${itemBySlot.get(9).GeosetGroup[0] + 1}`);
+			}
+
 			return enabled;
 		}
 
@@ -249,13 +254,23 @@ export default {
 			const displayInfo = {};
 			const soundKits = {};
 
+			function mapToSlot(item) {
+				if (item.class === 2 && item.subclass === 18)
+					return 10218;
+
+				if (item.class === 4 && item.subclass !== 6)
+					return 1042;
+
+				return item.class + 100;
+			}
+
 			var equiptemplate = d.creatureequiptemplate.get(id) ?? {};
 			const equipItems = equiptemplate.items
 				?.filter(item => item.displayid != null && !(item.class === 2 && item.subclass === 18))
 				.map(item => ({
 					...item,
 					ItemDisplayInfoID: item.displayid,
-					ItemSlot: item.class + 100,
+					ItemSlot: mapToSlot(item),
 				})) ?? [];
 
 			for (let i = 1; i <= 4; i++) {
@@ -273,6 +288,8 @@ export default {
 
 				for (const entry of itemEntries) {
 					const displayInfo = d.itemdisplayinfo.getRow(entry.ItemDisplayInfoID);
+					if (displayInfo == null)
+						continue;
 
 					const ModelMaterialResourcesIDFileIDs = displayInfo.ModelMaterialResourcesID.map(
 						(id, idx) => id === 0 ? id : DBTextureFileData.getTextureFDIDsByMatID(id)[idx]);
@@ -434,6 +451,8 @@ export default {
 					v-model:selection="creaturesSelection" :items="sortedCreatures" :filter="creaturesFilter" unittype="creature"
 					:single="true" :regex="config.regexFilters" :pasteselection="config.pasteSelection"
 					@update:selection="loadSelected($event[0]?.id)"
+					actionButton="Export"
+					@action="exportSelected()"
 				></listbox>
 			</div>
 			<div class="filter">

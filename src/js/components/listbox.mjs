@@ -32,8 +32,8 @@ export default {
 	 * override: If provided, used as an override listfile.
 	 * disable: If provided, used as reactive disable flag.
 	 */
-	props: ['items', 'filter', 'selection', 'single', 'keyinput', 'regex', 'copymode', 'pasteselection', 'copytrimwhitespace', 'includefilecount', 'unittype', 'override', 'disable'],
-	emits: ['update:selection'],
+	props: ['items', 'filter', 'selection', 'single', 'keyinput', 'regex', 'copymode', 'pasteselection', 'copytrimwhitespace', 'includefilecount', 'unittype', 'override', 'disable', 'actionButton'],
+	emits: ['update:selection', 'action'],
 
 	/**
 	 * Reactive instance data.
@@ -384,6 +384,7 @@ export default {
 		<div class="scroller" ref="scroller" @mousedown="startMouse" :class="{ using: isScrolling }" :style="{ top: scrollOffset }"><div></div></div>
 		<div v-for="(item, i) in displayItems" class="item" @click="selectItem(item, $event)" :class="{ selected: selection.includes(item) }">
 			<span v-for="(sub, si) in item.split('\\31')" :class="'sub sub-' + si" :data-item="sub">{{ sub }}</span>
+			<button v-if="actionButton" type="button" @click="$emit('action', item)">{{ actionButton }}</button>
 		</div>
 	</div>
 	<div class="list-status" v-if="unittype">{{ filteredItems.length }} {{ unittype + (filteredItems.length != 1 ? 's' : '') }} found. {{ selection.length > 0 ? ' (' + selection.length + ' selected)' : '' }}</div></div>`
