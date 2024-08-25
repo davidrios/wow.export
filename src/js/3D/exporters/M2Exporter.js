@@ -374,6 +374,16 @@ class M2Exporter {
 		fileManifest?.push({ type: 'GLTF', fileDataID: this.fileDataID, file: outGLTF });
 
 		await this.exportAttachments(out, helper, fileManifest);
+
+		if (core.view.config.modelsExportCollision) {
+			const phys = new OBJWriter(ExportHelper.replaceExtension(out, '.phys.obj'));
+			phys.setVertArray(this.m2.collisionPositions);
+			phys.setNormalArray(this.m2.collisionNormals);
+			phys.addMesh('Collision', this.m2.collisionIndices);
+
+			await phys.write(core.view.config.overwriteFiles);
+			fileManifest?.push({ type: 'PHYS_OBJ', fileDataID: this.fileDataID, file: phys.out });
+		}
 	}
 
 	/**

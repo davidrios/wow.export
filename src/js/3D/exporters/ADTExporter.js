@@ -1019,10 +1019,27 @@ class ADTExporter {
 								const data = await casc.getFile(fileDataID);
 								const m2 = new M2Exporter(data, undefined, fileDataID);
 
-								if (config.mapsExportRaw)
+								if (config.mapsExportRaw) {
 									await m2.exportRaw(modelPath, helper);
-								else
-									await m2.exportAsOBJ(modelPath, config.modelsExportCollision, helper);
+								}
+								else {
+									let exportAnim = false;
+									if (core.view.config.modelsExportAnimations) {
+										await m2.m2.load();
+										exportAnim = m2.m2.animations.length > 0 && m2.m2.bones.find(bone => 
+											bone.translation.timestamps.length > 0 ||
+											bone.rotation.timestamps.length > 0 ||
+											bone.scale.timestamps.length > 0) != null;
+									}
+
+									if (exportAnim) {
+										modelPath = modelPath.replace('.obj', '.gltf');
+										await m2.exportAsGLTF(modelPath, helper);
+									}
+									else {
+										await m2.exportAsOBJ(modelPath, config.modelsExportCollision, helper);
+									}
+								}
 								
 								// Abort if the export has been cancelled.
 								if (helper.isCancelled())
@@ -1054,6 +1071,7 @@ class ADTExporter {
 						} catch (e) {
 							log.write('Failed to export %s [%d]', fileName, fileDataID);
 							log.write('Error: %s', e);
+							console.error(e);
 						}
 					}
 				};

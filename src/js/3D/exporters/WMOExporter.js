@@ -537,7 +537,23 @@ class WMOExporter {
 							if (!doodadCache.has(fileDataID)) {
 								const data = await casc.getFile(fileDataID);
 								const m2Export = new M2Exporter(data, undefined, fileDataID);
-								await m2Export.exportAsOBJ(m2Path, core.view.config.modelsExportCollision, helper);
+
+								let exportAnim = false;
+								if (core.view.config.modelsExportAnimations) {
+									await m2Export.m2.load();
+									exportAnim = m2Export.m2.animations.length > 0 && m2Export.m2.bones.find(bone => 
+										bone.translation.timestamps.length > 0 ||
+										bone.rotation.timestamps.length > 0 ||
+										bone.scale.timestamps.length > 0) != null;
+								}
+
+								if (exportAnim) {
+									m2Path = m2Path.replace('.obj', '.gltf');
+									await m2Export.exportAsGLTF(m2Path, helper);
+								}
+								else {
+									await m2Export.exportAsOBJ(m2Path, core.view.config.modelsExportCollision, helper);
+								}
 
 								// Abort if the export has been cancelled.
 								if (helper.isCancelled())
