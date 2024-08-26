@@ -428,6 +428,18 @@ export default {
 			helper.finish();
 		}
 
+		async function exportAllSelected() {
+			for (const creature of creaturesSelection.value) {
+				creaturesSelection.value = [creature];
+				loadSelected(creature.id);
+				try {
+					await exportSelected();
+				} catch (e) {
+					console.error('failure for', creature, e);
+				}
+			}
+		}
+
 		return {
 			config: view.config,
 			isLoaded,
@@ -441,7 +453,8 @@ export default {
 			enabledGeosets,
 			...uiState,
 			loadSelected,
-			exportSelected
+			exportSelected,
+			exportAllSelected
 		};
 	},
 	template: `
@@ -449,9 +462,8 @@ export default {
 			<div class="list-container">
 				<listbox
 					v-model:selection="creaturesSelection" :items="sortedCreatures" :filter="creaturesFilter" unittype="creature"
-					:single="true" :regex="config.regexFilters" :pasteselection="config.pasteSelection"
+					:single="false" :regex="config.regexFilters" :pasteselection="config.pasteSelection"
 					@update:selection="loadSelected($event[0]?.id)"
-					actionButton="Export"
 					@action="exportSelected()"
 				></listbox>
 			</div>
@@ -527,6 +539,8 @@ export default {
 					<span>Export equipment OBJ</span>
 				</label>
 				<input type="button" value="Export" @click="exportSelected" :class="{ disabled: isBusy || selectedData == null }" />
+				<input type="button" value="Export All Selected" @click="exportAllSelected" style="margin-left: 10px"
+					:class="{ disabled: isBusy || creaturesSelection?.length < 1 }" />
 			</div>
 		</div>
 	`
